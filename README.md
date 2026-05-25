@@ -19,11 +19,9 @@ Economie Introductie Simulatie van Marketing en Logistieke elementen
   
 - Game setup
   - Admin
-    - Game { ID, Naam, Omschrijving, datum/starttijd, datum/eindtijd }
-    - Tussenstand { Leverancier, winst, marktaandeel, reclame uitgaven per medium, prijs stelling per segment, productie aantal per doelgroep }
-    - Eindstand { Leverancier, winst, marktaandeel, reclame uitgaven per medium, prijs stelling per segment, productie aantal per doelgroep }
-  - Player
-    - WordPress user 
+    - Player
+    - Game
+
 ---
 
 ## 🧩 Introductie
@@ -118,3 +116,13 @@ Voor de eindbeoordeling wordt gekeken naar:
 ## ✅ Einde
 - Bedankt voor uw deelname  
 - Vul het evaluatieformulier in a.u.b.
+
+
+## Game setup
+### Admin
+- Game { ID, Naam, Omschrijving, datum/starttijd, datum/eindtijd }
+- Tussenstand { Leverancier, winst, marktaandeel, reclame uitgaven per medium, prijs stelling per segment, productie aantal per doelgroep }
+- Eindstand { Leverancier, winst, marktaandeel, reclame uitgaven per medium, prijs stelling per segment, productie aantal per doelgroep }
+
+### Player
+- WordPress user 

@@ -1,4 +1,4 @@
-# 📄 Functionele beschrijving – WordPress plugin *BSO Spijkerbroek*
+# 📄 *BSO Spijkerbroek* - Leerling registratieproces
 
 ## 1. Doel en context
 De plugin **“bso-spijkerbroek”** ondersteunt het registratieproces van leerlingen die zich willen aanmelden als *spijkerbroek leverancier* via een WordPress website.
