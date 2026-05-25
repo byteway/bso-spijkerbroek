@@ -1,5 +1,5 @@
 # Spijkerbroekenspel
-Simulatie van marketing en logistieke elementen
+Economie Introductie Simulatie van Marketing en Logistieke elementen
 
 ---
 
@@ -16,13 +16,20 @@ Simulatie van marketing en logistieke elementen
 - Eind evaluatie
   - Bekendmaking winnaar
   - Uitleg achterliggende theorie
-
+  
+- Game setup
+  - Admin
+    - Game { ID, Naam, Omschrijving, datum/starttijd, datum/eindtijd }
+    - Tussenstand { Leverancier, winst, marktaandeel, reclame uitgaven per medium, prijs stelling per segment, productie aantal per doelgroep }
+    - Eindstand { Leverancier, winst, marktaandeel, reclame uitgaven per medium, prijs stelling per segment, productie aantal per doelgroep }
+  - Player
+    - WordPress user 
 ---
 
 ## 🧩 Introductie
 Het spijkerbroekenspel is een simulatie waarbij verschillende leveranciers strijden om een zo groot mogelijk marktaandeel.  
 
-Na iedere beurt ontvangt iedere leverancier een overzicht met de huidige status.  
+Na iedere beurt ontvangt iedere leverancier een overzicht met de huidige status.
 
 De leverancier met de meeste winst aan het eind van alle speelbeurten wint.
 
@@ -69,7 +76,7 @@ Voor de eindbeoordeling wordt gekeken naar:
 ## 📝 Registratie
 - Meld je aan als deelnemer  
 - Registreer je naam en e-mailadres  
-- Start de Jeans Game App en kies datum/tijdstip  
+- Start de Game en kies datum/tijdstip  
 - Kies een groep waar je bij hoort  
 - Meld je gereed  
 
