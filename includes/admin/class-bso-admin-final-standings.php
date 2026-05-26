@@ -1,0 +1,1 @@
+<?php class BSO_Admin_Final_Standings {}

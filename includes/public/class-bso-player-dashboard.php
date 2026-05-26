@@ -1,0 +1,1 @@
+<?php class BSO_Player_Dashboard {}
