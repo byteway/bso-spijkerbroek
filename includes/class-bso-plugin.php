@@ -10,6 +10,12 @@ class BSO_Plugin {
         add_action('init', array($this, 'register_shortcodes'));
 
         add_action('admin_post_bso_submit_commitment', array($this, 'handle_commitment_submit'));
+        add_action('admin_post_bso_create_game', array($this, 'handle_create_game'));
+        add_action('admin_post_bso_create_rounds', array($this, 'handle_create_rounds'));
+        add_action('admin_post_bso_create_organization', array($this, 'handle_create_organization'));
+        add_action('admin_post_bso_assign_player', array($this, 'handle_assign_player'));
+        add_action('admin_post_bso_remove_player_assignment', array($this, 'handle_remove_player_assignment'));
+        add_action('admin_post_bso_create_demo_setup', array($this, 'handle_create_demo_setup'));
         add_action('admin_post_bso_update_round_status', array($this, 'handle_round_status_update'));
         add_action('admin_post_bso_update_hr_request', array($this, 'handle_hr_request_update'));
         add_action('rest_api_init', array($this, 'register_rest_routes'));
@@ -50,6 +56,7 @@ class BSO_Plugin {
     public function register_shortcodes() {
         add_shortcode('bso_score', array($this, 'render_score_shortcode'));
         add_shortcode('bso_commitment', array($this, 'render_commitment_shortcode'));
+        add_shortcode('bso_team_dashboard', array($this, 'render_team_dashboard_shortcode'));
     }
 
     public function render_admin_dashboard() {
@@ -68,6 +75,8 @@ class BSO_Plugin {
             echo '<div class="notice notice-error is-dismissible"><p>' . esc_html($admin_error) . '</p></div>';
         }
 
+        echo $this->render_game_setup_panel($game_id);
+        echo $this->render_player_setup_panel($game_id);
         echo $this->render_round_management_panel($game_id);
         echo $this->render_hr_request_management_panel($game_id);
         echo '<div id="app" data-game-id="' . esc_attr((string) $game_id) . '"><p>Dashboard wordt geladen...</p></div>';
@@ -95,7 +104,31 @@ class BSO_Plugin {
             'round_id' => '0',
             'organization_id' => '0',
             'theme' => 'A',
+            'hide_ids' => '0',
         ), $atts);
+
+        $game_id = absint($atts['game_id']);
+        $round_id = absint($atts['round_id']);
+        $organization_id = absint($atts['organization_id']);
+        $resolved_context = null;
+
+        if ($game_id <= 0 || $round_id <= 0 || $organization_id <= 0) {
+            $resolved_context = $this->get_player_dashboard_context($game_id);
+            if ($resolved_context) {
+                $game_id = (int) $resolved_context['game_id'];
+                $round_id = (int) $resolved_context['round_id'];
+                $organization_id = (int) $resolved_context['organization_id'];
+            }
+        }
+
+        $commitment = $this->get_commitment_record($game_id, $round_id, $organization_id);
+        if (!empty($commitment['theme'])) {
+            $atts['theme'] = (string) $commitment['theme'];
+        }
+        $round_label = $resolved_context ? ('Ronde ' . (int) $resolved_context['round_turn_number']) : ('Ronde #' . $round_id);
+        $hide_ids = !empty($atts['hide_ids']) && $atts['hide_ids'] !== '0';
+        $show_manual_ids = !$hide_ids && $resolved_context === null;
+        $round_status = $resolved_context ? (string) $resolved_context['round_status'] : '';
 
         $error = isset($_GET['bso_error']) ? sanitize_text_field($_GET['bso_error']) : '';
         $success = isset($_GET['bso_success']) ? sanitize_text_field($_GET['bso_success']) : '';
@@ -103,6 +136,18 @@ class BSO_Plugin {
         ob_start();
         ?>
         <div class="bso-commitment-wrap">
+            <?php if ($resolved_context): ?>
+                <div class="bso-commitment-context">
+                    <p class="bso-commitment-context__eyebrow">Teamdashboard</p>
+                    <h3><?php echo esc_html($resolved_context['game_name']); ?> - <?php echo esc_html($resolved_context['organization_name']); ?></h3>
+                    <p>
+                        <?php echo esc_html($round_label); ?>
+                        <?php if ($round_status !== ''): ?>
+                            <span class="bso-commitment-context__status">(<?php echo esc_html($round_status); ?>)</span>
+                        <?php endif; ?>
+                    </p>
+                </div>
+            <?php endif; ?>
             <?php if ($success === '1'): ?>
                 <div class="notice notice-success"><p>Commitment opgeslagen.</p></div>
             <?php endif; ?>
@@ -110,25 +155,35 @@ class BSO_Plugin {
                 <div class="notice notice-error"><p><?php echo esc_html($error); ?></p></div>
             <?php endif; ?>
 
+            <?php if ($resolved_context && $round_status !== 'open'): ?>
+                <div class="notice notice-warning"><p>Deze ronde is gesloten. Je kunt de commitment hier nog bekijken, maar niet meer aanpassen.</p></div>
+            <?php endif; ?>
+
             <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>">
                 <?php wp_nonce_field('bso_submit_commitment'); ?>
                 <input type="hidden" name="action" value="bso_submit_commitment" />
 
-                <p>
-                    <label>Game ID<br />
-                        <input type="number" min="1" name="game_id" required value="<?php echo esc_attr($atts['game_id']); ?>" />
-                    </label>
-                </p>
-                <p>
-                    <label>Round ID<br />
-                        <input type="number" min="1" name="round_id" required value="<?php echo esc_attr($atts['round_id']); ?>" />
-                    </label>
-                </p>
-                <p>
-                    <label>Organization ID<br />
-                        <input type="number" min="1" name="organization_id" required value="<?php echo esc_attr($atts['organization_id']); ?>" />
-                    </label>
-                </p>
+                <?php if ($show_manual_ids): ?>
+                    <p>
+                        <label>Game ID<br />
+                            <input type="number" min="1" name="game_id" required value="<?php echo esc_attr((string) $game_id); ?>" />
+                        </label>
+                    </p>
+                    <p>
+                        <label>Round ID<br />
+                            <input type="number" min="1" name="round_id" required value="<?php echo esc_attr((string) $round_id); ?>" />
+                        </label>
+                    </p>
+                    <p>
+                        <label>Organization ID<br />
+                            <input type="number" min="1" name="organization_id" required value="<?php echo esc_attr((string) $organization_id); ?>" />
+                        </label>
+                    </p>
+                <?php else: ?>
+                    <input type="hidden" name="game_id" value="<?php echo esc_attr((string) $game_id); ?>" />
+                    <input type="hidden" name="round_id" value="<?php echo esc_attr((string) $round_id); ?>" />
+                    <input type="hidden" name="organization_id" value="<?php echo esc_attr((string) $organization_id); ?>" />
+                <?php endif; ?>
                 <p>
                     <label>Theme<br />
                         <select name="theme">
@@ -140,34 +195,140 @@ class BSO_Plugin {
                 </p>
                 <p>
                     <label>Prijs jeans<br />
-                        <input type="number" min="0" step="0.01" name="price_jeans" required value="0" />
+                        <input type="number" min="0" step="0.01" name="price_jeans" required value="<?php echo esc_attr(isset($commitment['price_jeans']) ? (string) $commitment['price_jeans'] : '0'); ?>" />
                     </label>
                 </p>
 
                 <h4>Reclame</h4>
-                <p><label>Family Weekly <input type="number" min="0" step="1" name="advertisement_family_weekly" value="0" /></label></p>
-                <p><label>Luxury Weekly <input type="number" min="0" step="1" name="advertisement_luxury_weekly" value="0" /></label></p>
-                <p><label>Newspaper <input type="number" min="0" step="1" name="advertisement_newspaper" value="0" /></label></p>
-                <p><label>TV Spots <input type="number" min="0" step="1" name="advertisement_tv" value="0" /></label></p>
-                <p><label>Marketing Research <input type="number" min="0" step="1" name="marketing_research" value="0" /></label></p>
+                <p><label>Family Weekly <input type="number" min="0" step="1" name="advertisement_family_weekly" value="<?php echo esc_attr(isset($commitment['advertisement_family_weekly']) ? (string) $commitment['advertisement_family_weekly'] : '0'); ?>" /></label></p>
+                <p><label>Luxury Weekly <input type="number" min="0" step="1" name="advertisement_luxury_weekly" value="<?php echo esc_attr(isset($commitment['advertisement_luxury_weekly']) ? (string) $commitment['advertisement_luxury_weekly'] : '0'); ?>" /></label></p>
+                <p><label>Newspaper <input type="number" min="0" step="1" name="advertisement_newspaper" value="<?php echo esc_attr(isset($commitment['advertisement_newspaper']) ? (string) $commitment['advertisement_newspaper'] : '0'); ?>" /></label></p>
+                <p><label>TV Spots <input type="number" min="0" step="1" name="advertisement_tv" value="<?php echo esc_attr(isset($commitment['advertisement_tv']) ? (string) $commitment['advertisement_tv'] : '0'); ?>" /></label></p>
+                <p><label>Marketing Research <input type="number" min="0" step="1" name="marketing_research" value="<?php echo esc_attr(isset($commitment['marketing_research']) ? (string) $commitment['marketing_research'] : '0'); ?>" /></label></p>
 
                 <h4>Productie</h4>
-                <p><label>Segment 1 (tight) <input type="number" min="0" step="1" name="production_segment_1" value="0" /></label></p>
-                <p><label>Segment 2 (half-width) <input type="number" min="0" step="1" name="production_segment_2" value="0" /></label></p>
-                <p><label>Segment 3 (wide) <input type="number" min="0" step="1" name="production_segment_3" value="0" /></label></p>
+                <p><label>Segment 1 (tight) <input type="number" min="0" step="1" name="production_segment_1" value="<?php echo esc_attr(isset($commitment['production_segment_1']) ? (string) $commitment['production_segment_1'] : '0'); ?>" /></label></p>
+                <p><label>Segment 2 (half-width) <input type="number" min="0" step="1" name="production_segment_2" value="<?php echo esc_attr(isset($commitment['production_segment_2']) ? (string) $commitment['production_segment_2'] : '0'); ?>" /></label></p>
+                <p><label>Segment 3 (wide) <input type="number" min="0" step="1" name="production_segment_3" value="<?php echo esc_attr(isset($commitment['production_segment_3']) ? (string) $commitment['production_segment_3'] : '0'); ?>" /></label></p>
 
                 <h4>Personeel</h4>
-                <p><label>Aanname personeel <input type="number" min="0" step="1" name="hiring_staff" value="0" /></label></p>
-                <p><label>Ontslag personeel <input type="number" min="0" step="1" name="layoff_staff" value="0" /></label></p>
+                <p><label>Aanname personeel <input type="number" min="0" step="1" name="hiring_staff" value="<?php echo esc_attr(isset($commitment['hiring_staff']) ? (string) $commitment['hiring_staff'] : '0'); ?>" /></label></p>
+                <p><label>Ontslag personeel <input type="number" min="0" step="1" name="layoff_staff" value="<?php echo esc_attr(isset($commitment['layoff_staff']) ? (string) $commitment['layoff_staff'] : '0'); ?>" /></label></p>
 
                 <p>
                     <label>Distribution form<br />
-                        <input type="text" name="distribution_form" maxlength="50" value="standard" />
+                        <input type="text" name="distribution_form" maxlength="50" value="<?php echo esc_attr(isset($commitment['distribution_form']) && $commitment['distribution_form'] !== '' ? (string) $commitment['distribution_form'] : 'standard'); ?>" />
                     </label>
                 </p>
 
-                <p><button type="submit">Commitment opslaan</button></p>
+                <?php if ($round_status === '' || $round_status === 'open'): ?>
+                    <p><button type="submit">Commitment opslaan</button></p>
+                <?php else: ?>
+                    <p class="bso-commitment-readonly">Deze ronde is gesloten.</p>
+                <?php endif; ?>
             </form>
+        </div>
+        <?php
+        return ob_get_clean();
+    }
+
+    public function render_team_dashboard_shortcode($atts = array()) {
+        if (!is_user_logged_in()) {
+            return '<div class="bso-team-dashboard bso-team-dashboard--login">Log in om je teamdashboard te bekijken.</div>';
+        }
+
+        $atts = shortcode_atts(array(
+            'game_id' => '0',
+        ), $atts);
+
+        $context = $this->get_player_dashboard_context(absint($atts['game_id']));
+        if (!$context) {
+            return '<div class="bso-team-dashboard bso-team-dashboard--empty">Je bent nog niet gekoppeld aan een organisatie in een actieve game.</div>';
+        }
+
+        wp_enqueue_style('bso-public-css');
+        wp_enqueue_script('bso-public-js');
+
+        $scoreboard_html = $this->render_dashboard_table($context['standings_rows'], 'tussenstand', (int) $context['organization_id']);
+        $commitment_status = !empty($context['commitment']) ? 'Opgeslagen' : 'Nog niet ingediend';
+        $can_submit = (string) $context['round_status'] === 'open';
+
+        ob_start();
+        ?>
+        <div class="bso-team-dashboard">
+            <header class="bso-team-dashboard__hero">
+                <div>
+                    <p class="bso-team-dashboard__eyebrow">Teamdashboard</p>
+                    <h2><?php echo esc_html($context['game_name']); ?></h2>
+                    <p class="bso-team-dashboard__lede">
+                        Je team: <strong><?php echo esc_html($context['organization_name']); ?></strong>
+                        <?php if (!empty($context['role_in_team'])): ?>
+                            <span class="bso-team-dashboard__role">· rol <?php echo esc_html($context['role_in_team']); ?></span>
+                        <?php endif; ?>
+                    </p>
+                </div>
+                <div class="bso-team-dashboard__hero-badges">
+                    <span class="bso-team-dashboard__badge">Ronde <?php echo esc_html((string) $context['round_turn_number']); ?></span>
+                    <span class="bso-team-dashboard__badge bso-team-dashboard__badge--status"><?php echo esc_html($context['round_status']); ?></span>
+                    <span class="bso-team-dashboard__badge bso-team-dashboard__badge--commitment"><?php echo esc_html($commitment_status); ?></span>
+                </div>
+            </header>
+
+            <div class="bso-team-dashboard__grid">
+                <section class="bso-team-dashboard__card">
+                    <h3>Teamoverzicht</h3>
+                    <dl class="bso-team-dashboard__facts">
+                        <div>
+                            <dt>Organisatie</dt>
+                            <dd><?php echo esc_html($context['organization_name']); ?></dd>
+                        </div>
+                        <div>
+                            <dt>Speler</dt>
+                            <dd><?php echo esc_html($context['player_display_name']); ?></dd>
+                        </div>
+                        <div>
+                            <dt>Rondestatus</dt>
+                            <dd><?php echo esc_html($context['round_status']); ?></dd>
+                        </div>
+                        <div>
+                            <dt>Commitment</dt>
+                            <dd><?php echo esc_html($commitment_status); ?></dd>
+                        </div>
+                    </dl>
+
+                    <?php if (!empty($context['organization_description'])): ?>
+                        <p class="bso-team-dashboard__description"><?php echo esc_html($context['organization_description']); ?></p>
+                    <?php endif; ?>
+                </section>
+
+                <section class="bso-team-dashboard__card bso-team-dashboard__card--scores">
+                    <div class="bso-team-dashboard__card-head">
+                        <h3>Tussenstand</h3>
+                        <p>Jouw organisatie is gemarkeerd in de ranking.</p>
+                    </div>
+                    <div class="bso-team-dashboard__scores" data-bso-scoreboard data-game-id="<?php echo esc_attr((string) $context['game_id']); ?>">
+                        <?php echo $scoreboard_html; ?>
+                    </div>
+                </section>
+
+                <section class="bso-team-dashboard__card bso-team-dashboard__card--commitment">
+                    <div class="bso-team-dashboard__card-head">
+                        <h3>Commitment</h3>
+                        <p><?php echo $can_submit ? 'Je kunt nu de commitment voor deze ronde indienen.' : 'Deze ronde is gesloten; je ziet hieronder de laatst opgeslagen versie.'; ?></p>
+                    </div>
+                    <?php if ($can_submit): ?>
+                        <?php echo $this->render_commitment_shortcode(array(
+                            'game_id' => (string) $context['game_id'],
+                            'round_id' => (string) $context['round_id'],
+                            'organization_id' => (string) $context['organization_id'],
+                            'theme' => !empty($context['commitment']['theme']) ? (string) $context['commitment']['theme'] : 'A',
+                            'hide_ids' => '1',
+                        )); ?>
+                    <?php else: ?>
+                        <?php echo $this->render_commitment_summary_block($context); ?>
+                    <?php endif; ?>
+                </section>
+            </div>
         </div>
         <?php
         return ob_get_clean();
@@ -188,6 +349,211 @@ class BSO_Plugin {
             $this->redirect_with_status('1', '');
         } catch (Exception $e) {
             $this->redirect_with_status('', $e->getMessage());
+        }
+    }
+
+    public function handle_create_game() {
+        if (!current_user_can('manage_options')) {
+            wp_die('Je hebt geen rechten om een game aan te maken.');
+        }
+
+        check_admin_referer('bso_create_game');
+
+        try {
+            $name = isset($_POST['game_name']) ? sanitize_text_field($_POST['game_name']) : '';
+            $description = isset($_POST['game_description']) ? sanitize_textarea_field($_POST['game_description']) : '';
+            $status = isset($_POST['game_status']) ? sanitize_text_field($_POST['game_status']) : 'draft';
+            $start_datetime = isset($_POST['start_datetime']) ? sanitize_text_field($_POST['start_datetime']) : '';
+            $end_datetime = isset($_POST['end_datetime']) ? sanitize_text_field($_POST['end_datetime']) : '';
+
+            if ($name === '') {
+                throw new Exception('Game naam is verplicht.');
+            }
+
+            if (!in_array($status, array('draft', 'active', 'completed', 'closed'), true)) {
+                $status = 'draft';
+            }
+
+            $game_id = $this->create_game_record($name, $description, $status, $start_datetime, $end_datetime);
+            $this->redirect_admin_dashboard($game_id, 'Game is aangemaakt.', '');
+        } catch (Exception $e) {
+            $this->redirect_admin_dashboard(0, '', $e->getMessage());
+        }
+    }
+
+    public function handle_create_rounds() {
+        if (!current_user_can('manage_options')) {
+            wp_die('Je hebt geen rechten om rondes aan te maken.');
+        }
+
+        check_admin_referer('bso_create_rounds');
+
+        try {
+            $game_id = isset($_POST['game_id']) ? absint($_POST['game_id']) : 0;
+            $round_count = isset($_POST['round_count']) ? absint($_POST['round_count']) : 0;
+            $default_status = isset($_POST['round_status']) ? sanitize_text_field($_POST['round_status']) : 'open';
+
+            if ($game_id <= 0) {
+                throw new Exception('Selecteer eerst een game.');
+            }
+
+            if ($round_count <= 0) {
+                $round_count = (int) $this->get_game_parameter($game_id, 'number_of_turns', 8);
+            }
+
+            if ($round_count <= 0) {
+                throw new Exception('Aantal rondes is ongeldig.');
+            }
+
+            if (!in_array($default_status, array('open', 'closed'), true)) {
+                $default_status = 'open';
+            }
+
+            $created = $this->create_round_records($game_id, $round_count, $default_status);
+            $this->redirect_admin_dashboard($game_id, $created . ' ronde(s) aangemaakt.', '');
+        } catch (Exception $e) {
+            $fallback_game_id = isset($_POST['game_id']) ? absint($_POST['game_id']) : 0;
+            $this->redirect_admin_dashboard($fallback_game_id, '', $e->getMessage());
+        }
+    }
+
+    public function handle_create_organization() {
+        if (!current_user_can('manage_options')) {
+            wp_die('Je hebt geen rechten om organisaties aan te maken.');
+        }
+
+        check_admin_referer('bso_create_organization');
+
+        try {
+            $game_id = isset($_POST['game_id']) ? absint($_POST['game_id']) : 0;
+            $name = isset($_POST['organization_name']) ? sanitize_text_field($_POST['organization_name']) : '';
+            $description = isset($_POST['organization_description']) ? sanitize_textarea_field($_POST['organization_description']) : '';
+
+            if ($game_id <= 0) {
+                throw new Exception('Selecteer eerst een game.');
+            }
+
+            if ($name === '') {
+                throw new Exception('Organisatienaam is verplicht.');
+            }
+
+            $this->create_organization_record($game_id, $name, $description);
+            $this->redirect_admin_dashboard($game_id, 'Organisatie is aangemaakt.', '');
+        } catch (Exception $e) {
+            $fallback_game_id = isset($_POST['game_id']) ? absint($_POST['game_id']) : 0;
+            $this->redirect_admin_dashboard($fallback_game_id, '', $e->getMessage());
+        }
+    }
+
+    public function handle_assign_player() {
+        if (!current_user_can('manage_options')) {
+            wp_die('Je hebt geen rechten om spelers te koppelen.');
+        }
+
+        check_admin_referer('bso_assign_player');
+
+        try {
+            $game_id = isset($_POST['game_id']) ? absint($_POST['game_id']) : 0;
+            $organization_id = isset($_POST['organization_id']) ? absint($_POST['organization_id']) : 0;
+            $wp_user_id = isset($_POST['wp_user_id']) ? absint($_POST['wp_user_id']) : 0;
+            $role_in_team = isset($_POST['role_in_team']) ? sanitize_text_field($_POST['role_in_team']) : '';
+
+            if ($game_id <= 0 || $organization_id <= 0 || $wp_user_id <= 0) {
+                throw new Exception('Game, organisatie en gebruiker zijn verplicht.');
+            }
+
+            $this->assign_player_to_organization($game_id, $organization_id, $wp_user_id, $role_in_team);
+            $this->redirect_admin_dashboard($game_id, 'Speler is gekoppeld aan de organisatie.', '');
+        } catch (Exception $e) {
+            $fallback_game_id = isset($_POST['game_id']) ? absint($_POST['game_id']) : 0;
+            $this->redirect_admin_dashboard($fallback_game_id, '', $e->getMessage());
+        }
+    }
+
+    public function handle_remove_player_assignment() {
+        if (!current_user_can('manage_options')) {
+            wp_die('Je hebt geen rechten om spelers te ontkoppelen.');
+        }
+
+        check_admin_referer('bso_remove_player_assignment');
+
+        try {
+            $game_id = isset($_POST['game_id']) ? absint($_POST['game_id']) : 0;
+            $player_id = isset($_POST['player_id']) ? absint($_POST['player_id']) : 0;
+
+            if ($game_id <= 0 || $player_id <= 0) {
+                throw new Exception('Game en spelerkoppeling zijn verplicht.');
+            }
+
+            $this->remove_player_assignment($player_id);
+            $this->redirect_admin_dashboard($game_id, 'Spelerkoppeling is verwijderd.', '');
+        } catch (Exception $e) {
+            $fallback_game_id = isset($_POST['game_id']) ? absint($_POST['game_id']) : 0;
+            $this->redirect_admin_dashboard($fallback_game_id, '', $e->getMessage());
+        }
+    }
+
+    public function handle_create_demo_setup() {
+        if (!current_user_can('manage_options')) {
+            wp_die('Je hebt geen rechten om een demo setup aan te maken.');
+        }
+
+        check_admin_referer('bso_create_demo_setup');
+
+        try {
+            $suffix = wp_date('Y-m-d H:i');
+            $game_name = 'Demo Spijkerbroekenspel ' . $suffix;
+            $game_id = $this->create_game_record(
+                $game_name,
+                'Automatisch aangemaakte demo setup voor snelle test van de plugin.',
+                'active',
+                '',
+                ''
+            );
+
+            $round_count = (int) $this->get_game_parameter($game_id, 'number_of_turns', 8);
+            if ($round_count <= 0) {
+                $round_count = 8;
+            }
+
+            $this->create_round_records($game_id, $round_count, 'open');
+
+            $organization_ids = array();
+            $organization_ids[] = $this->create_organization_record($game_id, 'Team Alpha', 'Demo team voor prijsfocus en stabiele productie.');
+            $organization_ids[] = $this->create_organization_record($game_id, 'Team Beta', 'Demo team voor marketing- en groeiscenario\'s.');
+            $organization_ids[] = $this->create_organization_record($game_id, 'Team Gamma', 'Demo team voor agressieve marktaandeelstrategie.');
+
+            $assigned_count = 0;
+            $demo_roles = array('teamlead', 'finance', 'marketing');
+            $users = get_users(array(
+                'orderby' => 'ID',
+                'order' => 'ASC',
+                'number' => 3,
+            ));
+
+            foreach ($users as $index => $user) {
+                if (!isset($organization_ids[$index])) {
+                    break;
+                }
+
+                $this->assign_player_to_organization(
+                    $game_id,
+                    (int) $organization_ids[$index],
+                    (int) $user->ID,
+                    $demo_roles[$index] ?? 'player'
+                );
+                $assigned_count++;
+            }
+
+            $message = 'Demo setup aangemaakt: 1 game, ' . $round_count . ' rondes, 3 organisaties';
+            if ($assigned_count > 0) {
+                $message .= ', ' . $assigned_count . ' spelerkoppeling(en)';
+            }
+            $message .= '.';
+
+            $this->redirect_admin_dashboard($game_id, $message, '');
+        } catch (Exception $e) {
+            $this->redirect_admin_dashboard(0, '', $e->getMessage());
         }
     }
 
@@ -1235,6 +1601,445 @@ class BSO_Plugin {
         exit;
     }
 
+    private function render_game_setup_panel($selected_game_id) {
+        global $wpdb;
+
+        $games_table = $wpdb->prefix . 'bso_games';
+        $orgs_table = $wpdb->prefix . 'bso_organizations';
+
+        $games = $wpdb->get_results(
+            "SELECT id, name, status FROM {$games_table} ORDER BY id DESC",
+            ARRAY_A
+        );
+
+        $active_game_id = (int) $selected_game_id;
+        if ($active_game_id <= 0 && !empty($games)) {
+            $active_game_id = (int) $games[0]['id'];
+        }
+
+        $organization_count = 0;
+        if ($active_game_id > 0) {
+            $organization_count = (int) $wpdb->get_var(
+                $wpdb->prepare(
+                    "SELECT COUNT(*) FROM {$orgs_table} WHERE game_id = %d",
+                    $active_game_id
+                )
+            );
+        }
+
+        $html = '<div class="bso-game-setup" style="margin:16px 0 24px 0; padding:16px; border:1px solid #dcdcde; background:#fff;">';
+        $html .= '<h2 style="margin-top:0;">Game Setup</h2>';
+        $html .= '<div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap:16px;">';
+
+        $html .= '<div style="padding:12px; border:1px solid #e0e0e0; background:#f8fbff;">';
+        $html .= '<h3 style="margin-top:0;">Quick Start / Demo Setup</h3>';
+        $html .= '<p>Maakt direct een demo game aan met standaardrondes, 3 organisaties en koppelt waar mogelijk de eerste WordPress-gebruikers.</p>';
+        $html .= '<form method="post" action="' . esc_url(admin_url('admin-post.php')) . '">';
+        $html .= '<input type="hidden" name="action" value="bso_create_demo_setup" />';
+        $html .= wp_nonce_field('bso_create_demo_setup', '_wpnonce', true, false);
+        $html .= '<p><button type="submit" class="button button-primary">Demo setup aanmaken</button></p>';
+        $html .= '</form>';
+        $html .= '</div>';
+
+        $html .= '<div style="padding:12px; border:1px solid #e0e0e0;">';
+        $html .= '<h3 style="margin-top:0;">Nieuwe game</h3>';
+        $html .= '<form method="post" action="' . esc_url(admin_url('admin-post.php')) . '">';
+        $html .= '<input type="hidden" name="action" value="bso_create_game" />';
+        $html .= wp_nonce_field('bso_create_game', '_wpnonce', true, false);
+        $html .= '<p><label>Naam<br /><input type="text" name="game_name" required style="width:100%;" /></label></p>';
+        $html .= '<p><label>Beschrijving<br /><textarea name="game_description" rows="4" style="width:100%;"></textarea></label></p>';
+        $html .= '<p><label>Status<br /><select name="game_status"><option value="draft">draft</option><option value="active">active</option></select></label></p>';
+        $html .= '<p><label>Startdatum/tijd<br /><input type="datetime-local" name="start_datetime" style="width:100%;" /></label></p>';
+        $html .= '<p><label>Einddatum/tijd<br /><input type="datetime-local" name="end_datetime" style="width:100%;" /></label></p>';
+        $html .= '<p><button type="submit" class="button button-primary">Game aanmaken</button></p>';
+        $html .= '</form>';
+        $html .= '</div>';
+
+        $html .= '<div style="padding:12px; border:1px solid #e0e0e0;">';
+        $html .= '<h3 style="margin-top:0;">Rondes genereren</h3>';
+        if (empty($games)) {
+            $html .= '<p>Maak eerst een game aan.</p>';
+        } else {
+            $html .= '<form method="post" action="' . esc_url(admin_url('admin-post.php')) . '">';
+            $html .= '<input type="hidden" name="action" value="bso_create_rounds" />';
+            $html .= wp_nonce_field('bso_create_rounds', '_wpnonce', true, false);
+            $html .= '<p><label>Game<br />' . $this->render_game_select('game_id', $games, $active_game_id) . '</label></p>';
+            $html .= '<p><label>Aantal rondes<br /><input type="number" min="1" max="30" name="round_count" value="8" style="width:100%;" /></label></p>';
+            $html .= '<p><label>Standaard status<br /><select name="round_status"><option value="open">open</option><option value="closed">closed</option></select></label></p>';
+            $html .= '<p><button type="submit" class="button">Rondes aanmaken</button></p>';
+            $html .= '</form>';
+        }
+        $html .= '</div>';
+
+        $html .= '<div style="padding:12px; border:1px solid #e0e0e0;">';
+        $html .= '<h3 style="margin-top:0;">Organisatie toevoegen</h3>';
+        if (empty($games)) {
+            $html .= '<p>Maak eerst een game aan.</p>';
+        } else {
+            $html .= '<p>Huidige organisaties in geselecteerde game: <strong>' . esc_html((string) $organization_count) . '</strong></p>';
+            $html .= '<form method="post" action="' . esc_url(admin_url('admin-post.php')) . '">';
+            $html .= '<input type="hidden" name="action" value="bso_create_organization" />';
+            $html .= wp_nonce_field('bso_create_organization', '_wpnonce', true, false);
+            $html .= '<p><label>Game<br />' . $this->render_game_select('game_id', $games, $active_game_id) . '</label></p>';
+            $html .= '<p><label>Organisatienaam<br /><input type="text" name="organization_name" required style="width:100%;" /></label></p>';
+            $html .= '<p><label>Beschrijving<br /><textarea name="organization_description" rows="4" style="width:100%;"></textarea></label></p>';
+            $html .= '<p><button type="submit" class="button">Organisatie toevoegen</button></p>';
+            $html .= '</form>';
+        }
+        $html .= '</div>';
+
+        $html .= '</div>';
+        $html .= '</div>';
+
+        return $html;
+    }
+
+    private function render_player_setup_panel($selected_game_id) {
+        global $wpdb;
+
+        $games_table = $wpdb->prefix . 'bso_games';
+        $players_table = $wpdb->prefix . 'bso_players';
+
+        $games = $wpdb->get_results(
+            "SELECT id, name, status FROM {$games_table} ORDER BY id DESC",
+            ARRAY_A
+        );
+
+        $active_game_id = (int) $selected_game_id;
+        if ($active_game_id <= 0 && !empty($games)) {
+            $active_game_id = (int) $games[0]['id'];
+        }
+
+        $organizations = $active_game_id > 0 ? $this->get_organizations_for_game($active_game_id) : array();
+        $users = get_users(array(
+            'orderby' => 'display_name',
+            'order' => 'ASC',
+            'fields' => array('ID', 'display_name', 'user_email'),
+        ));
+
+        $assignments = array();
+        if ($active_game_id > 0) {
+            $org_ids = array_map(function ($org) {
+                return (int) $org['id'];
+            }, $organizations);
+
+            if (!empty($org_ids)) {
+                $placeholders = implode(',', array_fill(0, count($org_ids), '%d'));
+                $query = $wpdb->prepare(
+                    "SELECT p.id, p.wp_user_id, p.organization_id, p.email, p.display_name, p.role_in_team, o.name AS organization_name
+                     FROM {$players_table} p
+                     INNER JOIN {$wpdb->prefix}bso_organizations o ON o.id = p.organization_id
+                     WHERE p.organization_id IN ({$placeholders})
+                     ORDER BY o.name ASC, p.display_name ASC",
+                    $org_ids
+                );
+                $assignments = $wpdb->get_results($query, ARRAY_A);
+            }
+        }
+
+        $html = '<div class="bso-player-setup" style="margin:16px 0 24px 0; padding:16px; border:1px solid #dcdcde; background:#fff;">';
+        $html .= '<h2 style="margin-top:0;">Player Setup</h2>';
+
+        if (empty($games)) {
+            $html .= '<p>Maak eerst een game aan voordat je spelers koppelt.</p>';
+            $html .= '</div>';
+            return $html;
+        }
+
+        $html .= '<div style="display:grid; grid-template-columns: minmax(320px, 420px) 1fr; gap:16px;">';
+
+        $html .= '<div style="padding:12px; border:1px solid #e0e0e0;">';
+        $html .= '<h3 style="margin-top:0;">Gebruiker koppelen</h3>';
+
+        if (empty($organizations)) {
+            $html .= '<p>Voeg eerst organisaties toe aan de geselecteerde game.</p>';
+        } elseif (empty($users)) {
+            $html .= '<p>Geen WordPress-gebruikers gevonden om te koppelen.</p>';
+        } else {
+            $html .= '<form method="post" action="' . esc_url(admin_url('admin-post.php')) . '">';
+            $html .= '<input type="hidden" name="action" value="bso_assign_player" />';
+            $html .= wp_nonce_field('bso_assign_player', '_wpnonce', true, false);
+            $html .= '<p><label>Game<br />' . $this->render_game_select('game_id', $games, $active_game_id) . '</label></p>';
+            $html .= '<p><label>Organisatie<br />' . $this->render_organization_select('organization_id', $organizations, 0) . '</label></p>';
+            $html .= '<p><label>WordPress-gebruiker<br />' . $this->render_user_select('wp_user_id', $users, 0) . '</label></p>';
+            $html .= '<p><label>Rol in team<br /><input type="text" name="role_in_team" maxlength="80" placeholder="bijv. teamlead, finance, marketing" style="width:100%;" /></label></p>';
+            $html .= '<p><button type="submit" class="button button-primary">Koppel speler</button></p>';
+            $html .= '</form>';
+        }
+
+        $html .= '</div>';
+
+        $html .= '<div style="padding:12px; border:1px solid #e0e0e0;">';
+        $html .= '<h3 style="margin-top:0;">Bestaande koppelingen</h3>';
+
+        if (empty($assignments)) {
+            $html .= '<p>Geen spelerkoppelingen gevonden voor deze game.</p>';
+        } else {
+            $html .= '<table class="widefat striped">';
+            $html .= '<thead><tr><th>Gebruiker</th><th>E-mail</th><th>Organisatie</th><th>Rol</th><th>Actie</th></tr></thead><tbody>';
+
+            foreach ($assignments as $assignment) {
+                $html .= '<tr>';
+                $html .= '<td>' . esc_html((string) ($assignment['display_name'] ?: ('User #' . (int) $assignment['wp_user_id']))) . '</td>';
+                $html .= '<td>' . esc_html((string) ($assignment['email'] ?: '-')) . '</td>';
+                $html .= '<td>' . esc_html((string) $assignment['organization_name']) . '</td>';
+                $html .= '<td>' . esc_html((string) ($assignment['role_in_team'] ?: '-')) . '</td>';
+                $html .= '<td>' . $this->render_player_remove_form($active_game_id, (int) $assignment['id']) . '</td>';
+                $html .= '</tr>';
+            }
+
+            $html .= '</tbody></table>';
+        }
+
+        $html .= '</div>';
+        $html .= '</div>';
+        $html .= '</div>';
+
+        return $html;
+    }
+
+    private function render_game_select($field_name, array $games, $selected_game_id) {
+        $html = '<select name="' . esc_attr($field_name) . '" style="width:100%;">';
+        foreach ($games as $game) {
+            $label = '#' . (int) $game['id'] . ' - ' . (string) $game['name'] . ' (' . (string) $game['status'] . ')';
+            $html .= '<option value="' . esc_attr((string) $game['id']) . '" ' . selected((int) $selected_game_id, (int) $game['id'], false) . '>' . esc_html($label) . '</option>';
+        }
+        $html .= '</select>';
+
+        return $html;
+    }
+
+    private function render_organization_select($field_name, array $organizations, $selected_organization_id) {
+        $html = '<select name="' . esc_attr($field_name) . '" style="width:100%;">';
+        foreach ($organizations as $organization) {
+            $html .= '<option value="' . esc_attr((string) $organization['id']) . '" ' . selected((int) $selected_organization_id, (int) $organization['id'], false) . '>' . esc_html((string) $organization['name']) . '</option>';
+        }
+        $html .= '</select>';
+
+        return $html;
+    }
+
+    private function render_user_select($field_name, array $users, $selected_user_id) {
+        $html = '<select name="' . esc_attr($field_name) . '" style="width:100%;">';
+        foreach ($users as $user) {
+            $label = $user->display_name . ' (' . $user->user_email . ')';
+            $html .= '<option value="' . esc_attr((string) $user->ID) . '" ' . selected((int) $selected_user_id, (int) $user->ID, false) . '>' . esc_html($label) . '</option>';
+        }
+        $html .= '</select>';
+
+        return $html;
+    }
+
+    private function render_player_remove_form($game_id, $player_id) {
+        $html = '<form method="post" action="' . esc_url(admin_url('admin-post.php')) . '" style="display:inline-block;">';
+        $html .= '<input type="hidden" name="action" value="bso_remove_player_assignment" />';
+        $html .= '<input type="hidden" name="game_id" value="' . esc_attr((string) ((int) $game_id)) . '" />';
+        $html .= '<input type="hidden" name="player_id" value="' . esc_attr((string) ((int) $player_id)) . '" />';
+        $html .= wp_nonce_field('bso_remove_player_assignment', '_wpnonce', true, false);
+        $html .= '<button type="submit" class="button button-secondary">Ontkoppel</button>';
+        $html .= '</form>';
+
+        return $html;
+    }
+
+    private function create_game_record($name, $description, $status, $start_datetime, $end_datetime) {
+        global $wpdb;
+
+        $games_table = $wpdb->prefix . 'bso_games';
+        $inserted = $wpdb->insert(
+            $games_table,
+            array(
+                'name' => $name,
+                'description' => $description,
+                'start_datetime' => $this->normalize_admin_datetime($start_datetime),
+                'end_datetime' => $this->normalize_admin_datetime($end_datetime),
+                'status' => $status,
+            ),
+            array('%s', '%s', '%s', '%s', '%s')
+        );
+
+        if ($inserted === false) {
+            throw new Exception('Game aanmaken is mislukt.');
+        }
+
+        return (int) $wpdb->insert_id;
+    }
+
+    private function create_round_records($game_id, $round_count, $default_status) {
+        global $wpdb;
+
+        $rounds_table = $wpdb->prefix . 'bso_game_rounds';
+        $existing_turns = $wpdb->get_col(
+            $wpdb->prepare(
+                "SELECT turn_number FROM {$rounds_table} WHERE game_id = %d",
+                $game_id
+            )
+        );
+        $existing_turn_map = array_fill_keys(array_map('intval', $existing_turns), true);
+
+        $created = 0;
+        for ($turn_number = 1; $turn_number <= $round_count; $turn_number++) {
+            if (isset($existing_turn_map[$turn_number])) {
+                continue;
+            }
+
+            $inserted = $wpdb->insert(
+                $rounds_table,
+                array(
+                    'game_id' => $game_id,
+                    'turn_number' => $turn_number,
+                    'status' => $default_status,
+                ),
+                array('%d', '%d', '%s')
+            );
+
+            if ($inserted === false) {
+                throw new Exception('Rondes aanmaken is mislukt bij beurt ' . $turn_number . '.');
+            }
+
+            $created++;
+        }
+
+        return $created;
+    }
+
+    private function create_organization_record($game_id, $name, $description) {
+        global $wpdb;
+
+        $orgs_table = $wpdb->prefix . 'bso_organizations';
+        $inserted = $wpdb->insert(
+            $orgs_table,
+            array(
+                'game_id' => $game_id,
+                'name' => $name,
+                'description' => $description,
+                'status' => 'active',
+            ),
+            array('%d', '%s', '%s', '%s')
+        );
+
+        if ($inserted === false) {
+            throw new Exception('Organisatie aanmaken is mislukt. Mogelijk bestaat de naam al binnen deze game.');
+        }
+
+        return (int) $wpdb->insert_id;
+    }
+
+    private function assign_player_to_organization($game_id, $organization_id, $wp_user_id, $role_in_team) {
+        global $wpdb;
+
+        $organization = $this->get_organization_record($organization_id, $game_id);
+        if (!$organization) {
+            throw new Exception('Organisatie hoort niet bij de geselecteerde game.');
+        }
+
+        $user = get_user_by('id', $wp_user_id);
+        if (!$user) {
+            throw new Exception('WordPress-gebruiker niet gevonden.');
+        }
+
+        $players_table = $wpdb->prefix . 'bso_players';
+        $existing_id = (int) $wpdb->get_var(
+            $wpdb->prepare(
+                "SELECT id FROM {$players_table} WHERE wp_user_id = %d AND organization_id = %d LIMIT 1",
+                $wp_user_id,
+                $organization_id
+            )
+        );
+
+        $payload = array(
+            'wp_user_id' => $wp_user_id,
+            'organization_id' => $organization_id,
+            'email' => (string) $user->user_email,
+            'display_name' => (string) $user->display_name,
+            'role_in_team' => $role_in_team,
+        );
+
+        if ($existing_id > 0) {
+            $updated = $wpdb->update(
+                $players_table,
+                $payload,
+                array('id' => $existing_id),
+                array('%d', '%d', '%s', '%s', '%s'),
+                array('%d')
+            );
+
+            if ($updated === false) {
+                throw new Exception('Spelerkoppeling bijwerken is mislukt.');
+            }
+
+            return $existing_id;
+        }
+
+        $inserted = $wpdb->insert(
+            $players_table,
+            $payload,
+            array('%d', '%d', '%s', '%s', '%s')
+        );
+
+        if ($inserted === false) {
+            throw new Exception('Spelerkoppeling aanmaken is mislukt.');
+        }
+
+        return (int) $wpdb->insert_id;
+    }
+
+    private function remove_player_assignment($player_id) {
+        global $wpdb;
+
+        $players_table = $wpdb->prefix . 'bso_players';
+        $deleted = $wpdb->delete(
+            $players_table,
+            array('id' => $player_id),
+            array('%d')
+        );
+
+        if ($deleted === false) {
+            throw new Exception('Spelerkoppeling verwijderen is mislukt.');
+        }
+    }
+
+    private function get_organizations_for_game($game_id) {
+        global $wpdb;
+
+        $orgs_table = $wpdb->prefix . 'bso_organizations';
+        return $wpdb->get_results(
+            $wpdb->prepare(
+                "SELECT id, name, description, status FROM {$orgs_table} WHERE game_id = %d ORDER BY name ASC",
+                $game_id
+            ),
+            ARRAY_A
+        );
+    }
+
+    private function get_organization_record($organization_id, $game_id) {
+        global $wpdb;
+
+        $orgs_table = $wpdb->prefix . 'bso_organizations';
+        return $wpdb->get_row(
+            $wpdb->prepare(
+                "SELECT id, game_id, name FROM {$orgs_table} WHERE id = %d AND game_id = %d LIMIT 1",
+                $organization_id,
+                $game_id
+            ),
+            ARRAY_A
+        );
+    }
+
+    private function normalize_admin_datetime($value) {
+        $value = trim((string) $value);
+        if ($value === '') {
+            return null;
+        }
+
+        $timestamp = strtotime($value);
+        if ($timestamp === false) {
+            return null;
+        }
+
+        return gmdate('Y-m-d H:i:s', $timestamp);
+    }
+
     private function render_round_management_panel($selected_game_id) {
         global $wpdb;
 
@@ -1506,6 +2311,144 @@ class BSO_Plugin {
         ));
     }
 
+    private function get_commitment_record($game_id, $round_id, $organization_id) {
+        global $wpdb;
+
+        if ($game_id <= 0 || $round_id <= 0 || $organization_id <= 0) {
+            return null;
+        }
+
+        $table = $wpdb->prefix . 'bso_commitments';
+        return $wpdb->get_row(
+            $wpdb->prepare(
+                "SELECT * FROM {$table} WHERE game_id = %d AND round_id = %d AND organization_id = %d LIMIT 1",
+                $game_id,
+                $round_id,
+                $organization_id
+            ),
+            ARRAY_A
+        );
+    }
+
+    private function get_round_record($game_id) {
+        global $wpdb;
+
+        $rounds_table = $wpdb->prefix . 'bso_game_rounds';
+        return $wpdb->get_row(
+            $wpdb->prepare(
+                "SELECT id, turn_number, status, start_datetime, end_datetime
+                 FROM {$rounds_table}
+                 WHERE game_id = %d
+                 ORDER BY CASE status WHEN 'open' THEN 0 WHEN 'locked' THEN 1 WHEN 'closed' THEN 2 ELSE 3 END, turn_number DESC, id DESC
+                 LIMIT 1",
+                $game_id
+            ),
+            ARRAY_A
+        );
+    }
+
+    private function render_commitment_summary_block(array $context) {
+        $commitment = !empty($context['commitment']) && is_array($context['commitment']) ? $context['commitment'] : array();
+
+        if (empty($commitment)) {
+            return '<div class="bso-commitment-summary"><p>Nog geen commitment opgeslagen voor deze ronde.</p></div>';
+        }
+
+        $summary = array(
+            'theme' => isset($commitment['theme']) ? (string) $commitment['theme'] : '-',
+            'price_jeans' => isset($commitment['price_jeans']) ? number_format_i18n((float) $commitment['price_jeans'], 2) : '0,00',
+            'advertisement_total' => isset($commitment['media_total']) ? number_format_i18n((float) $commitment['media_total'], 2) : '0,00',
+            'production_segment_1' => isset($commitment['production_segment_1']) ? (int) $commitment['production_segment_1'] : 0,
+            'production_segment_2' => isset($commitment['production_segment_2']) ? (int) $commitment['production_segment_2'] : 0,
+            'production_segment_3' => isset($commitment['production_segment_3']) ? (int) $commitment['production_segment_3'] : 0,
+            'hiring_staff' => isset($commitment['hiring_staff']) ? (int) $commitment['hiring_staff'] : 0,
+            'layoff_staff' => isset($commitment['layoff_staff']) ? (int) $commitment['layoff_staff'] : 0,
+            'distribution_form' => isset($commitment['distribution_form']) && $commitment['distribution_form'] !== '' ? (string) $commitment['distribution_form'] : '-',
+        );
+
+        $html = '<div class="bso-commitment-summary">';
+        $html .= '<p><strong>Laatste commitment</strong></p>';
+        $html .= '<ul class="bso-commitment-summary__list">';
+        $html .= '<li>Thema: ' . esc_html($summary['theme']) . '</li>';
+        $html .= '<li>Prijs jeans: ' . esc_html($summary['price_jeans']) . '</li>';
+        $html .= '<li>Media totaal: ' . esc_html($summary['advertisement_total']) . '</li>';
+        $html .= '<li>Productie: ' . esc_html((string) $summary['production_segment_1']) . ' / ' . esc_html((string) $summary['production_segment_2']) . ' / ' . esc_html((string) $summary['production_segment_3']) . '</li>';
+        $html .= '<li>Personeel: + ' . esc_html((string) $summary['hiring_staff']) . ' / - ' . esc_html((string) $summary['layoff_staff']) . '</li>';
+        $html .= '<li>Distributie: ' . esc_html($summary['distribution_form']) . '</li>';
+        $html .= '</ul>';
+        $html .= '</div>';
+
+        return $html;
+    }
+
+    private function get_player_dashboard_context($requested_game_id = 0) {
+        global $wpdb;
+
+        $user_id = get_current_user_id();
+        if ($user_id <= 0) {
+            return null;
+        }
+
+        $players_table = $wpdb->prefix . 'bso_players';
+        $orgs_table = $wpdb->prefix . 'bso_organizations';
+        $games_table = $wpdb->prefix . 'bso_games';
+
+        $params = array($user_id);
+        $game_filter = '';
+        if ($requested_game_id > 0) {
+            $game_filter = ' AND g.id = %d';
+            $params[] = $requested_game_id;
+        }
+
+        $player = $wpdb->get_row(
+            $wpdb->prepare(
+                "SELECT
+                    p.id AS player_id,
+                    p.wp_user_id,
+                    p.organization_id,
+                    p.role_in_team,
+                    p.display_name AS player_display_name,
+                    o.name AS organization_name,
+                    o.description AS organization_description,
+                    o.status AS organization_status,
+                    g.id AS game_id,
+                    g.name AS game_name,
+                    g.description AS game_description,
+                    g.status AS game_status
+                 FROM {$players_table} p
+                 INNER JOIN {$orgs_table} o ON o.id = p.organization_id
+                 INNER JOIN {$games_table} g ON g.id = o.game_id
+                 WHERE p.wp_user_id = %d {$game_filter}
+                 ORDER BY CASE g.status WHEN 'active' THEN 0 WHEN 'draft' THEN 1 WHEN 'completed' THEN 2 WHEN 'closed' THEN 3 ELSE 4 END, g.id DESC, p.id DESC
+                 LIMIT 1",
+                $params
+            ),
+            ARRAY_A
+        );
+
+        if (!$player) {
+            return null;
+        }
+
+        $round = $this->get_round_record((int) $player['game_id']);
+        if (!$round) {
+            return null;
+        }
+
+        $commitment = $this->get_commitment_record((int) $player['game_id'], (int) $round['id'], (int) $player['organization_id']);
+        $standings_rows = $this->get_scores_for_round((int) $player['game_id'], (int) $round['id']);
+
+        return array_merge($player, array(
+            'round_id' => (int) $round['id'],
+            'round_turn_number' => (int) $round['turn_number'],
+            'round_status' => (string) $round['status'],
+            'round_start_datetime' => isset($round['start_datetime']) ? (string) $round['start_datetime'] : '',
+            'round_end_datetime' => isset($round['end_datetime']) ? (string) $round['end_datetime'] : '',
+            'commitment' => $commitment,
+            'standings_rows' => $standings_rows,
+        ));
+    }
+
     private function resolve_dashboard_context($requested_game_id) {
         global $wpdb;
 
@@ -1595,7 +2538,7 @@ class BSO_Plugin {
         );
     }
 
-    private function render_dashboard_table(array $rows, $table_type) {
+    private function render_dashboard_table(array $rows, $table_type, $highlight_organization_id = 0) {
         if (empty($rows)) {
             return '<p>Geen scoredata beschikbaar voor deze ronde.</p>';
         }
@@ -1607,7 +2550,8 @@ class BSO_Plugin {
 
         foreach ($rows as $row) {
             $rank = !empty($row['rank_position']) ? (int) $row['rank_position'] : '-';
-            $html .= '<tr>';
+            $row_class = ((int) $highlight_organization_id > 0 && (int) $row['organization_id'] === (int) $highlight_organization_id) ? ' class="bso-score-table__row bso-score-table__row--highlight"' : ' class="bso-score-table__row"';
+            $html .= '<tr' . $row_class . '>';
             $html .= '<td>' . esc_html((string) $rank) . '</td>';
             $html .= '<td>' . esc_html((string) $row['organization_name']) . '</td>';
             $html .= '<td>' . esc_html(number_format_i18n((float) $row['turnover'], 2)) . '</td>';

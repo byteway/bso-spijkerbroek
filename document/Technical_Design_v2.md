@@ -1,7 +1,7 @@
 # Technisch Ontwerp v2 - BSO Spijkerbroek
 
 **Plugin:** `bso-spijkerbroek`  
-**Documentversie:** 2.1.0  
+**Documentversie:** 2.1.6  
 **Status:** In opbouw (implementatiegericht)  
 **Datum:** 28 juni 2026  
 **Doel:** 1 centrale technische blauwdruk voor stapsgewijze realisatie
@@ -25,6 +25,12 @@
 | 2.0.8 | 2026-06-28 | T12 geimplementeerd: HR-aanvraagbeheer UI met approve/reject/reset en decision notes | Copilot |
 | 2.0.9 | 2026-06-28 | T13 geimplementeerd: REST API endpoints voor commitments, scores en hr-requests | Copilot |
 | 2.1.0 | 2026-06-28 | T14 geimplementeerd: formula-v2 validatieprotocol + afgedwongen golden update workflow | Copilot |
+| 2.1.1 | 2026-06-28 | T15 geimplementeerd: Game Setup UI voor games, rondes en organisaties | Copilot |
+| 2.1.2 | 2026-06-28 | T16 geimplementeerd: Player Setup UI voor koppeling van WP-gebruikers aan organisaties | Copilot |
+| 2.1.3 | 2026-06-28 | T17 geimplementeerd: Quick Start / Demo Setup voor snelle speelbare testconfiguratie | Copilot |
+| 2.1.4 | 2026-06-28 | Demo setup uitgebreid tot volledig speelbare testconfiguratie met snelle start | Copilot |
+| 2.1.5 | 2026-06-28 | T18 geimplementeerd: organisatiegericht frontend/teamdashboard voor spelers | Copilot |
+| 2.1.6 | 2026-06-28 | Game Ready werkboard + quick test stappen voor WordPress devsite toegevoegd | Copilot |
 
 ### 1.2 Projectstatus
 
@@ -33,9 +39,10 @@
 | Basis plugin bootstrap | Basis gereed | Runtime klasse + hook wiring aanwezig |
 | Datamodel ontwerp | Geimplementeerd basis | dbDelta schema + parameter seeds actief |
 | Scorelogica ontwerp | Geimplementeerd basis | v1-formule actief, bronbladvalidatie blijft open |
-| Admin UI | Geimplementeerd basis | Rondebeheer + HR-aanvraagbeheer (approve/reject/reset + notes) actief |
-| Frontend formulieren | Niet gestart | Alleen concept |
+| Admin UI | Geimplementeerd uitgebreid | Setup UI voor games/rondes/organisaties/spelers + demo setup + rondebeheer + HR-aanvraagbeheer actief |
+| Frontend formulieren | Geimplementeerd uitgebreid | Organisatiegericht teamdashboard + commitmentflow actief |
 | API/AJAX laag | Geimplementeerd uitgebreid | Dashboard endpoint + REST routes voor commitments/scores/hr-requests |
+| Release readiness | In voorbereiding | Game Ready smoke test, mobile check en contentplaatsing |
 
 ### 1.3 Werkboard (voor uitvoering)
 
@@ -55,6 +62,20 @@
 | T12 | HR-aanvraagbeheer UI (approve/reject + notes) | Midden | Gereed | v2.5 |
 | T13 | REST API endpoints voor commitments/scores/hr | Midden | Gereed | v2.6 |
 | T14 | Formula v2 validatie tegen bronmodel (golden update protocol) | Hoog | Gereed | v2.6 |
+| T15 | Game Setup UI (games, rondes, organisaties) | Hoog | Gereed | v2.6 |
+| T16 | Player Setup UI (WP-gebruikers koppelen aan organisaties) | Hoog | Gereed | v2.6 |
+| T17 | Quick Start / Demo Setup | Midden | Gereed | v2.6 |
+| T18 | Organisatiegericht frontend/teamdashboard voor spelers | Hoog | Gereed | v2.7 |
+
+### 1.4 Werkboard - Game Ready
+
+| ID | Taak | Prioriteit | Status | Doelversie |
+|----|------|------------|--------|------------|
+| T19 | Devsite smoke test: demo setup, dashboard en commitmentflow | Hoog | Niet gestart | Game Ready |
+| T20 | Shortcode en pagina plaatsen voor spelersdashboard | Hoog | Niet gestart | Game Ready |
+| T21 | Spelerpad testen: login, teamherkenning, commitment submit, refresh | Hoog | Niet gestart | Game Ready |
+| T22 | Responsive polish en lege-staten controle op mobiel/desktop | Midden | Niet gestart | Game Ready |
+| T23 | Release checklist en handoff-notities voor beheerder | Midden | Niet gestart | Game Ready |
 
 ---
 
@@ -454,6 +475,19 @@ Specifieke fixture draaien:
 ```bash
 php tests/regression/runtime_score_engine_db_test.php --wp-load=/absolute/path/to/wp-load.php --fixture=score_engine_multiround_hr.json
 ```
+
+## 11.3 Quick Steps - WordPress devsite
+
+Gebruik dit pad om snel te testen of de plugin Game Ready is op je devsite:
+
+1. Activeer de plugin in WordPress en open daarna `BSO Spijkerbroek` in het admin menu.
+2. Klik op `Quick Start / Demo Setup` zodat er direct een game, rondes, organisaties en spelerkoppelingen worden aangemaakt.
+3. Maak een nieuwe pagina, bijvoorbeeld `Teamdashboard`, en plaats daar de shortcode `[bso_team_dashboard]`.
+4. Log in als een gekoppelde demo-gebruiker of koppel je eigen WP-user via `Player Setup`.
+5. Open de pagina en controleer of de organisatie, ronde en tussenstand automatisch verschijnen.
+6. Dien een commitment in en ververs de pagina om te zien of de opgeslagen waarden terugkomen.
+7. Open daarna `Rondebeheer` en sluit of lock de ronde om te verifiëren dat de frontend read-only wordt.
+8. Controleer in `HR-aanvraagbeheer` en het score-dashboard of de data synchroon blijft met de laatste actie.
 
 ---
 
