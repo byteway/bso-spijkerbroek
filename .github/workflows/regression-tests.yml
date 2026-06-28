@@ -23,4 +23,4 @@ jobs:
           coverage: none
 
       - name: Run score engine golden regression test
-        run: php tests/regression/score_engine_golden_test.php
+        run: php tests/regression/score_engine_golden_test.php --formula-version=v1

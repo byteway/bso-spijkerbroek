@@ -1,5 +1,13 @@
 {
     "name": "multi-round regression with HR resignations",
+    "meta": {
+        "formula_version": "v1",
+        "source_model": "Game_Control.xls",
+        "operator_order_verified": false,
+        "last_updated_at": "2026-06-28T19:56:24+00:00",
+        "last_update_reason": "T14 protocol normalization",
+        "updated_by": "score_engine_golden_test.php"
+    },
     "parameters": {
         "target_price_theme_a": 75,
         "target_price_theme_b": 95,

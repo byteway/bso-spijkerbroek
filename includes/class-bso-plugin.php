@@ -10,6 +10,9 @@ class BSO_Plugin {
         add_action('init', array($this, 'register_shortcodes'));
 
         add_action('admin_post_bso_submit_commitment', array($this, 'handle_commitment_submit'));
+        add_action('admin_post_bso_update_round_status', array($this, 'handle_round_status_update'));
+        add_action('admin_post_bso_update_hr_request', array($this, 'handle_hr_request_update'));
+        add_action('rest_api_init', array($this, 'register_rest_routes'));
         add_action('bso_spijkerbroek_recalculate_scores', array($this, 'handle_scheduled_recalculation'));
 
         add_action('wp_ajax_bso_dashboard_data', array($this, 'ajax_dashboard_data'));
@@ -51,7 +54,24 @@ class BSO_Plugin {
 
     public function render_admin_dashboard() {
         $game_id = isset($_GET['game_id']) ? absint($_GET['game_id']) : 0;
-        echo '<div class="wrap"><h1>BSO Spijkerbroek Dashboard</h1><div id="app" data-game-id="' . esc_attr((string) $game_id) . '"><p>Dashboard wordt geladen...</p></div></div>';
+
+        $admin_error = isset($_GET['bso_admin_error']) ? sanitize_text_field($_GET['bso_admin_error']) : '';
+        $admin_success = isset($_GET['bso_admin_success']) ? sanitize_text_field($_GET['bso_admin_success']) : '';
+
+        echo '<div class="wrap">';
+        echo '<h1>BSO Spijkerbroek Dashboard</h1>';
+
+        if ($admin_success !== '') {
+            echo '<div class="notice notice-success is-dismissible"><p>' . esc_html($admin_success) . '</p></div>';
+        }
+        if ($admin_error !== '') {
+            echo '<div class="notice notice-error is-dismissible"><p>' . esc_html($admin_error) . '</p></div>';
+        }
+
+        echo $this->render_round_management_panel($game_id);
+        echo $this->render_hr_request_management_panel($game_id);
+        echo '<div id="app" data-game-id="' . esc_attr((string) $game_id) . '"><p>Dashboard wordt geladen...</p></div>';
+        echo '</div>';
     }
 
     public function render_score_shortcode($atts = array()) {
@@ -193,6 +213,331 @@ class BSO_Plugin {
             if ($end_ts !== false && $end_ts <= $now_ts) {
                 $this->close_round_and_apply_hr($game_id, $round_id);
             }
+        }
+    }
+
+    public function handle_round_status_update() {
+        if (!current_user_can('manage_options')) {
+            wp_die('Je hebt geen rechten om rondebeheer uit te voeren.');
+        }
+
+        check_admin_referer('bso_update_round_status');
+
+        try {
+            $game_id = isset($_POST['game_id']) ? absint($_POST['game_id']) : 0;
+            $round_id = isset($_POST['round_id']) ? absint($_POST['round_id']) : 0;
+            $status_action = isset($_POST['status_action']) ? sanitize_text_field($_POST['status_action']) : '';
+
+            if ($game_id <= 0 || $round_id <= 0) {
+                throw new Exception('Game en ronde zijn verplicht.');
+            }
+
+            if (!in_array($status_action, array('open', 'close', 'lock'), true)) {
+                throw new Exception('Ongeldige ronde-actie.');
+            }
+
+            if ($status_action === 'open') {
+                $this->set_round_status($game_id, $round_id, 'open');
+                $this->redirect_admin_dashboard($game_id, 'Ronde is geopend.', '');
+            }
+
+            $this->recalculate_round_scores($game_id, $round_id);
+            $this->close_round_and_apply_hr($game_id, $round_id);
+
+            $success_message = $status_action === 'lock'
+                ? 'Ronde is gelockt en gesloten.'
+                : 'Ronde is gesloten.';
+
+            $this->redirect_admin_dashboard($game_id, $success_message, '');
+        } catch (Exception $e) {
+            $fallback_game_id = isset($_POST['game_id']) ? absint($_POST['game_id']) : 0;
+            $this->redirect_admin_dashboard($fallback_game_id, '', $e->getMessage());
+        }
+    }
+
+    public function handle_hr_request_update() {
+        if (!current_user_can('manage_options')) {
+            wp_die('Je hebt geen rechten om HR-aanvragen te beheren.');
+        }
+
+        check_admin_referer('bso_update_hr_request');
+
+        try {
+            $game_id = isset($_POST['game_id']) ? absint($_POST['game_id']) : 0;
+            $request_id = isset($_POST['request_id']) ? absint($_POST['request_id']) : 0;
+            $status_action = isset($_POST['status_action']) ? sanitize_text_field($_POST['status_action']) : '';
+            $decision_note = isset($_POST['decision_note']) ? sanitize_textarea_field($_POST['decision_note']) : '';
+            $effective_round = isset($_POST['effective_round']) ? absint($_POST['effective_round']) : 0;
+
+            if ($game_id <= 0 || $request_id <= 0) {
+                throw new Exception('Game en HR-aanvraag zijn verplicht.');
+            }
+
+            if (!in_array($status_action, array('approved', 'rejected', 'pending'), true)) {
+                throw new Exception('Ongeldige HR-actie.');
+            }
+
+            $this->update_hr_request_status($game_id, $request_id, $status_action, $decision_note, $effective_round);
+
+            $status_label = $status_action === 'approved' ? 'goedgekeurd' : ($status_action === 'rejected' ? 'afgewezen' : 'teruggezet naar pending');
+            $this->redirect_admin_dashboard($game_id, 'HR-aanvraag is ' . $status_label . '.', '');
+        } catch (Exception $e) {
+            $fallback_game_id = isset($_POST['game_id']) ? absint($_POST['game_id']) : 0;
+            $this->redirect_admin_dashboard($fallback_game_id, '', $e->getMessage());
+        }
+    }
+
+    public function register_rest_routes() {
+        register_rest_route('bso/v1', '/scores', array(
+            'methods' => 'GET',
+            'callback' => array($this, 'rest_get_scores'),
+            'permission_callback' => '__return_true',
+        ));
+
+        register_rest_route('bso/v1', '/commitments', array(
+            'methods' => 'POST',
+            'callback' => array($this, 'rest_post_commitment'),
+            'permission_callback' => function () {
+                return is_user_logged_in();
+            },
+        ));
+
+        register_rest_route('bso/v1', '/hr-requests', array(
+            array(
+                'methods' => 'GET',
+                'callback' => array($this, 'rest_get_hr_requests'),
+                'permission_callback' => function () {
+                    return current_user_can('manage_options');
+                },
+            ),
+            array(
+                'methods' => 'POST',
+                'callback' => array($this, 'rest_post_hr_request'),
+                'permission_callback' => function () {
+                    return is_user_logged_in();
+                },
+            ),
+        ));
+
+        register_rest_route('bso/v1', '/hr-requests/(?P<id>\d+)/status', array(
+            'methods' => 'POST',
+            'callback' => array($this, 'rest_update_hr_request_status'),
+            'permission_callback' => function () {
+                return current_user_can('manage_options');
+            },
+        ));
+    }
+
+    public function rest_get_scores($request) {
+        try {
+            $game_id = absint($request->get_param('game_id'));
+            $round_id = absint($request->get_param('round_id'));
+
+            if ($game_id <= 0) {
+                $context = $this->resolve_dashboard_context(0);
+                if (!$context) {
+                    return new WP_REST_Response(array(
+                        'status' => 'empty',
+                        'summary' => array(),
+                        'standings' => array(),
+                        'final' => array(),
+                    ), 200);
+                }
+                $game_id = (int) $context['game_id'];
+            }
+
+            if ($round_id <= 0) {
+                $context = $this->resolve_dashboard_context($game_id);
+                if (!$context) {
+                    return new WP_REST_Response(array(
+                        'status' => 'empty',
+                        'summary' => array(),
+                        'standings' => array(),
+                        'final' => array(),
+                    ), 200);
+                }
+
+                $round_id = (int) $context['latest_round_id'];
+                $is_finalized = (bool) $context['is_finalized'];
+                $turn_number = (int) $context['latest_turn_number'];
+            } else {
+                $turn_number = $this->get_round_turn_number($game_id, $round_id);
+                $context = $this->resolve_dashboard_context($game_id);
+                $is_finalized = $context ? (bool) $context['is_finalized'] : false;
+            }
+
+            $standings_rows = $this->get_scores_for_round($game_id, $round_id);
+            $final_rows = $is_finalized ? $this->get_scores_for_round($game_id, $round_id) : array();
+
+            return new WP_REST_Response(array(
+                'status' => 'ok',
+                'summary' => array(
+                    'game_id' => $game_id,
+                    'round_id' => $round_id,
+                    'turn_number' => $turn_number,
+                    'is_finalized' => $is_finalized,
+                ),
+                'standings' => $this->format_rows_for_response($standings_rows),
+                'final' => $this->format_rows_for_response($final_rows),
+            ), 200);
+        } catch (Exception $e) {
+            return new WP_Error('bso_rest_scores_error', $e->getMessage(), array('status' => 400));
+        }
+    }
+
+    public function rest_post_commitment($request) {
+        try {
+            $payload = $request->get_json_params();
+            if (!is_array($payload) || empty($payload)) {
+                $payload = $request->get_params();
+            }
+
+            $data = $this->validate_commitment_input($payload);
+            $this->assert_round_open($data['game_id'], $data['round_id']);
+            $this->save_commitment($data);
+            $this->recalculate_round_scores($data['game_id'], $data['round_id']);
+
+            return new WP_REST_Response(array(
+                'status' => 'ok',
+                'message' => 'Commitment opgeslagen.',
+                'data' => array(
+                    'game_id' => $data['game_id'],
+                    'round_id' => $data['round_id'],
+                    'organization_id' => $data['organization_id'],
+                ),
+            ), 200);
+        } catch (Exception $e) {
+            return new WP_Error('bso_rest_commitment_error', $e->getMessage(), array('status' => 400));
+        }
+    }
+
+    public function rest_get_hr_requests($request) {
+        global $wpdb;
+
+        $game_id = absint($request->get_param('game_id'));
+        if ($game_id <= 0) {
+            return new WP_Error('bso_rest_hr_game_required', 'game_id is verplicht.', array('status' => 400));
+        }
+
+        $hr_table = $wpdb->prefix . 'bso_hr_requests';
+        $rounds_table = $wpdb->prefix . 'bso_game_rounds';
+        $orgs_table = $wpdb->prefix . 'bso_organizations';
+
+        $rows = $wpdb->get_results(
+            $wpdb->prepare(
+                "SELECT
+                    h.id,
+                    h.game_id,
+                    h.round_id,
+                    r.turn_number,
+                    h.organization_id,
+                    COALESCE(o.name, CONCAT('Organisatie #', h.organization_id)) AS organization_name,
+                    h.request_type,
+                    h.requested_count,
+                    h.effective_round,
+                    h.status,
+                    h.reason,
+                    h.decision_note,
+                    h.updated_at
+                 FROM {$hr_table} h
+                 LEFT JOIN {$rounds_table} r ON r.id = h.round_id
+                 LEFT JOIN {$orgs_table} o ON o.id = h.organization_id
+                 WHERE h.game_id = %d
+                 ORDER BY h.round_id DESC, h.id DESC",
+                $game_id
+            ),
+            ARRAY_A
+        );
+
+        return new WP_REST_Response(array(
+            'status' => 'ok',
+            'items' => $rows,
+        ), 200);
+    }
+
+    public function rest_post_hr_request($request) {
+        global $wpdb;
+
+        try {
+            $payload = $request->get_json_params();
+            if (!is_array($payload) || empty($payload)) {
+                $payload = $request->get_params();
+            }
+
+            $game_id = $this->positive_int($payload, 'game_id', 'Game ID');
+            $round_id = $this->positive_int($payload, 'round_id', 'Round ID');
+            $organization_id = $this->positive_int($payload, 'organization_id', 'Organization ID');
+            $requested_count = $this->non_negative_int($payload, 'requested_count', 'Requested count');
+
+            $request_type = isset($payload['request_type']) ? sanitize_text_field($payload['request_type']) : 'resignation';
+            if ($request_type === '') {
+                $request_type = 'resignation';
+            }
+
+            $reason = isset($payload['reason']) ? sanitize_textarea_field($payload['reason']) : '';
+
+            $hr_table = $wpdb->prefix . 'bso_hr_requests';
+            $inserted = $wpdb->insert(
+                $hr_table,
+                array(
+                    'game_id' => $game_id,
+                    'round_id' => $round_id,
+                    'organization_id' => $organization_id,
+                    'request_type' => $request_type,
+                    'requested_count' => $requested_count,
+                    'effective_round' => null,
+                    'status' => 'pending',
+                    'reason' => $reason,
+                    'decision_note' => '',
+                ),
+                array('%d', '%d', '%d', '%s', '%d', null, '%s', '%s', '%s')
+            );
+
+            if ($inserted === false) {
+                throw new Exception('HR-aanvraag opslaan is mislukt.');
+            }
+
+            return new WP_REST_Response(array(
+                'status' => 'ok',
+                'message' => 'HR-aanvraag opgeslagen.',
+                'request_id' => (int) $wpdb->insert_id,
+            ), 201);
+        } catch (Exception $e) {
+            return new WP_Error('bso_rest_hr_create_error', $e->getMessage(), array('status' => 400));
+        }
+    }
+
+    public function rest_update_hr_request_status($request) {
+        try {
+            $payload = $request->get_json_params();
+            if (!is_array($payload) || empty($payload)) {
+                $payload = $request->get_params();
+            }
+
+            $request_id = absint($request->get_param('id'));
+            $game_id = $this->positive_int($payload, 'game_id', 'Game ID');
+            $status_action = isset($payload['status_action']) ? sanitize_text_field($payload['status_action']) : '';
+            $decision_note = isset($payload['decision_note']) ? sanitize_textarea_field($payload['decision_note']) : '';
+            $effective_round = isset($payload['effective_round']) ? absint($payload['effective_round']) : 0;
+
+            if ($request_id <= 0) {
+                throw new Exception('HR-aanvraag ID is verplicht.');
+            }
+
+            if (!in_array($status_action, array('approved', 'rejected', 'pending'), true)) {
+                throw new Exception('Ongeldige HR-actie.');
+            }
+
+            $this->update_hr_request_status($game_id, $request_id, $status_action, $decision_note, $effective_round);
+
+            return new WP_REST_Response(array(
+                'status' => 'ok',
+                'message' => 'HR-aanvraag bijgewerkt.',
+                'request_id' => $request_id,
+                'status_action' => $status_action,
+            ), 200);
+        } catch (Exception $e) {
+            return new WP_Error('bso_rest_hr_update_error', $e->getMessage(), array('status' => 400));
         }
     }
 
@@ -557,6 +902,108 @@ class BSO_Plugin {
         );
     }
 
+    private function set_round_status($game_id, $round_id, $new_status) {
+        global $wpdb;
+
+        $rounds_table = $wpdb->prefix . 'bso_game_rounds';
+        $updated = $wpdb->update(
+            $rounds_table,
+            array('status' => $new_status),
+            array('id' => $round_id, 'game_id' => $game_id),
+            array('%s'),
+            array('%d', '%d')
+        );
+
+        if ($updated === false) {
+            throw new Exception('Ronde status wijzigen is mislukt.');
+        }
+    }
+
+    private function update_hr_request_status($game_id, $request_id, $status_action, $decision_note, $effective_round) {
+        global $wpdb;
+
+        $hr_table = $wpdb->prefix . 'bso_hr_requests';
+        $request = $wpdb->get_row(
+            $wpdb->prepare(
+                "SELECT id, game_id, round_id, requested_count FROM {$hr_table} WHERE id = %d AND game_id = %d LIMIT 1",
+                $request_id,
+                $game_id
+            ),
+            ARRAY_A
+        );
+
+        if (!$request) {
+            throw new Exception('HR-aanvraag niet gevonden voor deze game.');
+        }
+
+        $requested_count = max(0, (int) $request['requested_count']);
+        if ($status_action === 'approved' && $requested_count <= 0) {
+            throw new Exception('Aanvraag met requested_count 0 kan niet worden goedgekeurd.');
+        }
+
+        if ($status_action === 'approved') {
+            if ($effective_round <= 0) {
+                $effective_round = $this->get_round_turn_number($game_id, (int) $request['round_id']) + 1;
+            }
+
+            if ($effective_round <= 0) {
+                throw new Exception('Effective round kon niet worden bepaald.');
+            }
+
+            $updated = $wpdb->update(
+                $hr_table,
+                array(
+                    'status' => 'approved',
+                    'effective_round' => $effective_round,
+                    'decision_note' => $decision_note,
+                ),
+                array('id' => $request_id),
+                array('%s', '%d', '%s'),
+                array('%d')
+            );
+
+            if ($updated === false) {
+                throw new Exception('HR-aanvraag kon niet worden bijgewerkt.');
+            }
+            return;
+        }
+
+        if ($status_action === 'rejected') {
+            $updated = $wpdb->update(
+                $hr_table,
+                array(
+                    'status' => 'rejected',
+                    'effective_round' => null,
+                    'decision_note' => $decision_note,
+                ),
+                array('id' => $request_id),
+                array('%s', null, '%s'),
+                array('%d')
+            );
+
+            if ($updated === false) {
+                throw new Exception('HR-aanvraag kon niet worden bijgewerkt.');
+            }
+            return;
+        }
+
+        $updated = $wpdb->update(
+            $hr_table,
+            array(
+                'status' => 'pending',
+                'effective_round' => null,
+                'decision_note' => $decision_note,
+            ),
+            array('id' => $request_id),
+            array('%s', null, '%s'),
+            array('%d')
+        );
+
+        if ($updated === false) {
+            throw new Exception('HR-aanvraag kon niet worden bijgewerkt.');
+        }
+    }
+
     private function approve_pending_resignation_requests($game_id, $round_id, $effective_turn_number) {
         global $wpdb;
 
@@ -765,6 +1212,248 @@ class BSO_Plugin {
 
         wp_safe_redirect(add_query_arg($args, $target));
         exit;
+    }
+
+    private function redirect_admin_dashboard($game_id, $success_message, $error_message) {
+        $args = array(
+            'page' => 'bso-spijkerbroek',
+        );
+
+        if ((int) $game_id > 0) {
+            $args['game_id'] = (int) $game_id;
+        }
+
+        if ($success_message !== '') {
+            $args['bso_admin_success'] = $success_message;
+        }
+
+        if ($error_message !== '') {
+            $args['bso_admin_error'] = $error_message;
+        }
+
+        wp_safe_redirect(add_query_arg($args, admin_url('admin.php')));
+        exit;
+    }
+
+    private function render_round_management_panel($selected_game_id) {
+        global $wpdb;
+
+        $games_table = $wpdb->prefix . 'bso_games';
+        $rounds_table = $wpdb->prefix . 'bso_game_rounds';
+
+        $games = $wpdb->get_results(
+            "SELECT id, name, status FROM {$games_table} ORDER BY id DESC",
+            ARRAY_A
+        );
+
+        $html = '<div class="bso-round-management" style="margin:16px 0 24px 0; padding:16px; border:1px solid #dcdcde; background:#fff;">';
+        $html .= '<h2 style="margin-top:0;">Rondebeheer</h2>';
+
+        if (empty($games)) {
+            $html .= '<p>Geen games gevonden. Voeg eerst een game en rondes toe.</p>';
+            $html .= '</div>';
+            return $html;
+        }
+
+        $active_game_id = (int) $selected_game_id;
+        if ($active_game_id <= 0) {
+            $active_game_id = (int) $games[0]['id'];
+        }
+
+        $html .= '<form method="get" action="' . esc_url(admin_url('admin.php')) . '" style="margin-bottom:12px;">';
+        $html .= '<input type="hidden" name="page" value="bso-spijkerbroek" />';
+        $html .= '<label for="bso_game_id"><strong>Game:</strong></label> ';
+        $html .= '<select id="bso_game_id" name="game_id">';
+        foreach ($games as $game) {
+            $label = '#' . (int) $game['id'] . ' - ' . (string) $game['name'] . ' (' . (string) $game['status'] . ')';
+            $html .= '<option value="' . esc_attr((string) $game['id']) . '" ' . selected($active_game_id, (int) $game['id'], false) . '>' . esc_html($label) . '</option>';
+        }
+        $html .= '</select> ';
+        $html .= '<button type="submit" class="button">Toon rondes</button>';
+        $html .= '</form>';
+
+        $rounds = $wpdb->get_results(
+            $wpdb->prepare(
+                "SELECT id, turn_number, status, start_datetime, end_datetime
+                 FROM {$rounds_table}
+                 WHERE game_id = %d
+                 ORDER BY turn_number ASC",
+                $active_game_id
+            ),
+            ARRAY_A
+        );
+
+        if (empty($rounds)) {
+            $html .= '<p>Geen rondes gevonden voor deze game.</p>';
+            $html .= '</div>';
+            return $html;
+        }
+
+        $html .= '<table class="widefat striped">';
+        $html .= '<thead><tr>';
+        $html .= '<th>Ronde ID</th><th>Beurt</th><th>Status</th><th>Start</th><th>Einde</th><th>Acties</th>';
+        $html .= '</tr></thead><tbody>';
+
+        foreach ($rounds as $round) {
+            $round_id = (int) $round['id'];
+            $status = (string) $round['status'];
+
+            $html .= '<tr>';
+            $html .= '<td>' . esc_html((string) $round_id) . '</td>';
+            $html .= '<td>' . esc_html((string) ((int) $round['turn_number'])) . '</td>';
+            $html .= '<td><strong>' . esc_html($status) . '</strong></td>';
+            $html .= '<td>' . esc_html((string) ($round['start_datetime'] ?: '-')) . '</td>';
+            $html .= '<td>' . esc_html((string) ($round['end_datetime'] ?: '-')) . '</td>';
+            $html .= '<td>';
+
+            if ($status === 'open') {
+                $html .= $this->render_round_status_form($active_game_id, $round_id, 'close', 'Sluit');
+                $html .= ' ';
+                $html .= $this->render_round_status_form($active_game_id, $round_id, 'lock', 'Lock');
+            } else {
+                $html .= $this->render_round_status_form($active_game_id, $round_id, 'open', 'Open');
+            }
+
+            $html .= '</td>';
+            $html .= '</tr>';
+        }
+
+        $html .= '</tbody></table>';
+        $html .= '</div>';
+
+        return $html;
+    }
+
+    private function render_hr_request_management_panel($selected_game_id) {
+        global $wpdb;
+
+        $games_table = $wpdb->prefix . 'bso_games';
+        $hr_table = $wpdb->prefix . 'bso_hr_requests';
+        $rounds_table = $wpdb->prefix . 'bso_game_rounds';
+        $orgs_table = $wpdb->prefix . 'bso_organizations';
+
+        $games = $wpdb->get_results(
+            "SELECT id, name, status FROM {$games_table} ORDER BY id DESC",
+            ARRAY_A
+        );
+
+        $html = '<div class="bso-hr-management" style="margin:16px 0 24px 0; padding:16px; border:1px solid #dcdcde; background:#fff;">';
+        $html .= '<h2 style="margin-top:0;">HR-aanvraagbeheer</h2>';
+
+        if (empty($games)) {
+            $html .= '<p>Geen games gevonden. Voeg eerst een game en HR-aanvragen toe.</p>';
+            $html .= '</div>';
+            return $html;
+        }
+
+        $active_game_id = (int) $selected_game_id;
+        if ($active_game_id <= 0) {
+            $active_game_id = (int) $games[0]['id'];
+        }
+
+        $requests = $wpdb->get_results(
+            $wpdb->prepare(
+                "SELECT
+                    h.id,
+                    h.round_id,
+                    r.turn_number,
+                    h.organization_id,
+                    COALESCE(o.name, CONCAT('Organisatie #', h.organization_id)) AS organization_name,
+                    h.request_type,
+                    h.requested_count,
+                    h.effective_round,
+                    h.status,
+                    h.reason,
+                    h.decision_note,
+                    h.updated_at
+                 FROM {$hr_table} h
+                 LEFT JOIN {$rounds_table} r ON r.id = h.round_id
+                 LEFT JOIN {$orgs_table} o ON o.id = h.organization_id
+                 WHERE h.game_id = %d
+                 ORDER BY
+                    CASE h.status WHEN 'pending' THEN 0 WHEN 'approved' THEN 1 WHEN 'rejected' THEN 2 ELSE 3 END,
+                    h.round_id DESC,
+                    h.id DESC",
+                $active_game_id
+            ),
+            ARRAY_A
+        );
+
+        if (empty($requests)) {
+            $html .= '<p>Geen HR-aanvragen gevonden voor deze game.</p>';
+            $html .= '</div>';
+            return $html;
+        }
+
+        $html .= '<table class="widefat striped">';
+        $html .= '<thead><tr>';
+        $html .= '<th>ID</th><th>Ronde</th><th>Organisatie</th><th>Type</th><th>Aantal</th><th>Status</th><th>Effective round</th><th>Reason</th><th>Decision note</th><th>Actie</th>';
+        $html .= '</tr></thead><tbody>';
+
+        foreach ($requests as $request) {
+            $request_id = (int) $request['id'];
+            $current_status = (string) $request['status'];
+            $turn_label = !empty($request['turn_number']) ? ((string) ((int) $request['turn_number'])) : '-';
+            $effective_round = !empty($request['effective_round']) ? (int) $request['effective_round'] : '';
+
+            $html .= '<tr>';
+            $html .= '<td>' . esc_html((string) $request_id) . '</td>';
+            $html .= '<td>#' . esc_html((string) ((int) $request['round_id'])) . ' / beurt ' . esc_html($turn_label) . '</td>';
+            $html .= '<td>' . esc_html((string) $request['organization_name']) . '</td>';
+            $html .= '<td>' . esc_html((string) $request['request_type']) . '</td>';
+            $html .= '<td>' . esc_html((string) ((int) $request['requested_count'])) . '</td>';
+            $html .= '<td><strong>' . esc_html($current_status) . '</strong></td>';
+            $html .= '<td>' . esc_html($effective_round === '' ? '-' : (string) $effective_round) . '</td>';
+            $html .= '<td>' . esc_html((string) ($request['reason'] ?: '-')) . '</td>';
+            $html .= '<td>' . esc_html((string) ($request['decision_note'] ?: '-')) . '</td>';
+            $html .= '<td>';
+
+            $html .= $this->render_hr_request_action_form($active_game_id, $request_id, 'approved', 'Approve', (string) ($request['decision_note'] ?: ''), $effective_round);
+            $html .= $this->render_hr_request_action_form($active_game_id, $request_id, 'rejected', 'Reject', (string) ($request['decision_note'] ?: ''), '');
+            if ($current_status !== 'pending') {
+                $html .= $this->render_hr_request_action_form($active_game_id, $request_id, 'pending', 'Reset', (string) ($request['decision_note'] ?: ''), '');
+            }
+
+            $html .= '</td>';
+            $html .= '</tr>';
+        }
+
+        $html .= '</tbody></table>';
+        $html .= '</div>';
+
+        return $html;
+    }
+
+    private function render_hr_request_action_form($game_id, $request_id, $status_action, $label, $decision_note, $effective_round) {
+        $html = '<form method="post" action="' . esc_url(admin_url('admin-post.php')) . '" style="display:block; margin:0 0 8px 0;">';
+        $html .= '<input type="hidden" name="action" value="bso_update_hr_request" />';
+        $html .= '<input type="hidden" name="game_id" value="' . esc_attr((string) ((int) $game_id)) . '" />';
+        $html .= '<input type="hidden" name="request_id" value="' . esc_attr((string) ((int) $request_id)) . '" />';
+        $html .= '<input type="hidden" name="status_action" value="' . esc_attr($status_action) . '" />';
+        $html .= wp_nonce_field('bso_update_hr_request', '_wpnonce', true, false);
+
+        if ($status_action === 'approved') {
+            $html .= '<input type="number" min="1" name="effective_round" value="' . esc_attr((string) $effective_round) . '" placeholder="Effective round" style="width:120px; margin-right:4px;" />';
+        }
+
+        $html .= '<input type="text" name="decision_note" value="' . esc_attr($decision_note) . '" placeholder="Decision note" style="width:190px; margin-right:4px;" />';
+        $html .= '<button type="submit" class="button button-secondary">' . esc_html($label) . '</button>';
+        $html .= '</form>';
+
+        return $html;
+    }
+
+    private function render_round_status_form($game_id, $round_id, $status_action, $label) {
+        $html = '<form method="post" action="' . esc_url(admin_url('admin-post.php')) . '" style="display:inline-block; margin:0 6px 0 0;">';
+        $html .= '<input type="hidden" name="action" value="bso_update_round_status" />';
+        $html .= '<input type="hidden" name="game_id" value="' . esc_attr((string) ((int) $game_id)) . '" />';
+        $html .= '<input type="hidden" name="round_id" value="' . esc_attr((string) ((int) $round_id)) . '" />';
+        $html .= '<input type="hidden" name="status_action" value="' . esc_attr($status_action) . '" />';
+        $html .= wp_nonce_field('bso_update_round_status', '_wpnonce', true, false);
+        $html .= '<button type="submit" class="button button-secondary">' . esc_html($label) . '</button>';
+        $html .= '</form>';
+
+        return $html;
     }
 
     public function ajax_dashboard_data() {

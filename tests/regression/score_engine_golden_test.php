@@ -7,14 +7,37 @@ declare(strict_types=1);
  *
  * Usage:
  * - php tests/regression/score_engine_golden_test.php
- * - php tests/regression/score_engine_golden_test.php --update-golden
+ * - php tests/regression/score_engine_golden_test.php --formula-version=v1
+ * - php tests/regression/score_engine_golden_test.php --update-golden --formula-version=v1 --accept-golden-update=yes --update-reason="why"
  */
 
 const BSO_TOLERANCE = 0.0001;
 
 $rootDir = dirname(__DIR__, 2);
 $goldenDir = $rootDir . '/tests/golden';
-$updateGolden = in_array('--update-golden', $argv, true);
+$options = parse_options($argv);
+
+$updateGolden = array_key_exists('update-golden', $options);
+$formulaVersion = isset($options['formula-version']) ? trim((string) $options['formula-version']) : 'v1';
+$acceptGoldenUpdate = isset($options['accept-golden-update']) && $options['accept-golden-update'] === 'yes';
+$updateReason = isset($options['update-reason']) ? trim((string) $options['update-reason']) : '';
+
+if ($formulaVersion === '') {
+    fwrite(STDERR, "Option --formula-version mag niet leeg zijn.\n");
+    exit(1);
+}
+
+if ($updateGolden) {
+    if (!$acceptGoldenUpdate) {
+        fwrite(STDERR, "Gebruik voor golden updates: --accept-golden-update=yes\n");
+        exit(1);
+    }
+
+    if ($updateReason === '') {
+        fwrite(STDERR, "Gebruik voor golden updates: --update-reason=\"...\"\n");
+        exit(1);
+    }
+}
 
 $files = glob($goldenDir . '/*.json');
 if (!$files) {
@@ -34,9 +57,19 @@ foreach ($files as $file) {
         continue;
     }
 
+    $metaError = validate_fixture_meta($fixture, $formulaVersion, $file);
+    if ($metaError !== '') {
+        fwrite(STDERR, $metaError . "\n");
+        $hadFailures = true;
+        continue;
+    }
+
     $computed = compute_expected_rows($fixture);
 
     if ($updateGolden) {
+        $fixture['meta']['last_updated_at'] = gmdate('c');
+        $fixture['meta']['last_update_reason'] = $updateReason;
+        $fixture['meta']['updated_by'] = 'score_engine_golden_test.php';
         $fixture['expected'] = array('rows' => $computed);
         file_put_contents($file, json_encode($fixture, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) . "\n");
         echo "UPDATED {$file}\n";
@@ -71,6 +104,55 @@ if ($hadFailures) {
 
 echo "All golden regression tests passed ({$fixtureCount}).\n";
 exit(0);
+
+function parse_options(array $argv): array
+{
+    $options = array();
+
+    foreach ($argv as $arg) {
+        if (strpos($arg, '--') !== 0) {
+            continue;
+        }
+
+        $token = substr($arg, 2);
+        if ($token === '') {
+            continue;
+        }
+
+        if (strpos($token, '=') === false) {
+            $options[$token] = '1';
+            continue;
+        }
+
+        $parts = explode('=', $token, 2);
+        $key = $parts[0] ?? '';
+        $value = $parts[1] ?? '';
+        if ($key !== '') {
+            $options[$key] = $value;
+        }
+    }
+
+    return $options;
+}
+
+function validate_fixture_meta(array $fixture, string $formulaVersion, string $file): string
+{
+    $meta = $fixture['meta'] ?? null;
+    if (!is_array($meta)) {
+        return "{$file}: missing meta block";
+    }
+
+    $fixtureVersion = isset($meta['formula_version']) ? (string) $meta['formula_version'] : '';
+    if ($fixtureVersion === '') {
+        return "{$file}: meta.formula_version ontbreekt";
+    }
+
+    if ($fixtureVersion !== $formulaVersion) {
+        return "{$file}: formula_version mismatch fixture={$fixtureVersion} runner={$formulaVersion}";
+    }
+
+    return '';
+}
 
 function compare_rows(array $expectedRows, array $actualRows, string $file): string
 {

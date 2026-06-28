@@ -1,7 +1,7 @@
 # Technisch Ontwerp v2 - BSO Spijkerbroek
 
 **Plugin:** `bso-spijkerbroek`  
-**Documentversie:** 2.0.4  
+**Documentversie:** 2.1.0  
 **Status:** In opbouw (implementatiegericht)  
 **Datum:** 28 juni 2026  
 **Doel:** 1 centrale technische blauwdruk voor stapsgewijze realisatie
@@ -19,6 +19,12 @@
 | 2.0.2 | 2026-06-28 | T06 geimplementeerd: dashboard endpoint leest en toont tussenstand/eindstand uit `bso_round_scores` | Copilot |
 | 2.0.3 | 2026-06-28 | T07 geimplementeerd: HR resignation verwerkt bij rondeafsluiting en doorwerking naar personeelscapaciteit | Copilot |
 | 2.0.4 | 2026-06-28 | T08 geimplementeerd: golden regressietests en multiround HR-scenario toegevoegd | Copilot |
+| 2.0.5 | 2026-06-28 | Werkboard geactualiseerd en uitgebreid met CI + vervolgtaken na T08 | Copilot |
+| 2.0.6 | 2026-06-28 | T10 geimplementeerd: runtime DB regressietest tegen golden fixtures toegevoegd | Copilot |
+| 2.0.7 | 2026-06-28 | T11 geimplementeerd: admin rondebeheer UI met openen/sluiten/lock en statushandler | Copilot |
+| 2.0.8 | 2026-06-28 | T12 geimplementeerd: HR-aanvraagbeheer UI met approve/reject/reset en decision notes | Copilot |
+| 2.0.9 | 2026-06-28 | T13 geimplementeerd: REST API endpoints voor commitments, scores en hr-requests | Copilot |
+| 2.1.0 | 2026-06-28 | T14 geimplementeerd: formula-v2 validatieprotocol + afgedwongen golden update workflow | Copilot |
 
 ### 1.2 Projectstatus
 
@@ -27,9 +33,9 @@
 | Basis plugin bootstrap | Basis gereed | Runtime klasse + hook wiring aanwezig |
 | Datamodel ontwerp | Geimplementeerd basis | dbDelta schema + parameter seeds actief |
 | Scorelogica ontwerp | Geimplementeerd basis | v1-formule actief, bronbladvalidatie blijft open |
-| Admin UI | Niet gestart | Alleen concept |
+| Admin UI | Geimplementeerd basis | Rondebeheer + HR-aanvraagbeheer (approve/reject/reset + notes) actief |
 | Frontend formulieren | Niet gestart | Alleen concept |
-| API/AJAX laag | Geimplementeerd basis | Dashboard endpoint levert tussenstand/eindstand payload uit round scores |
+| API/AJAX laag | Geimplementeerd uitgebreid | Dashboard endpoint + REST routes voor commitments/scores/hr-requests |
 
 ### 1.3 Werkboard (voor uitvoering)
 
@@ -43,6 +49,12 @@
 | T06 | Dashboard tussenstand/eindstand | Midden | Gereed | v2.3 |
 | T07 | HR resignation workflow | Midden | Gereed | v2.4 |
 | T08 | Testset + regressiechecks formules | Hoog | Gereed | v2.4 |
+| T09 | CI workflow voor regressietests | Hoog | Gereed | v2.4 |
+| T10 | Runtime regressietest (DB output vs golden fixtures) | Hoog | Gereed | v2.5 |
+| T11 | Admin rondebeheer UI (openen/sluiten/lock) | Hoog | Gereed | v2.5 |
+| T12 | HR-aanvraagbeheer UI (approve/reject + notes) | Midden | Gereed | v2.5 |
+| T13 | REST API endpoints voor commitments/scores/hr | Midden | Gereed | v2.6 |
+| T14 | Formula v2 validatie tegen bronmodel (golden update protocol) | Hoog | Gereed | v2.6 |
 
 ---
 
@@ -72,7 +84,7 @@ Deze versie combineert:
 - `includes/class-bso-plugin.php` bestaat met basis hook wiring.
 - activator/deactivator hebben nu minimale callable methods.
 - `uninstall.php` is placeholder.
-- `assets/js/admin.js` en `assets/js/public.js` pollen op `bso_dashboard_data` (placeholder actief).
+- `assets/js/admin.js` en `assets/js/public.js` pollen op `bso_dashboard_data` met actuele scorepayload.
 - CSS-bestanden zijn placeholders.
 
 ```mermaid
@@ -80,7 +92,7 @@ graph TD
 	WP[WordPress] --> MAIN[bso-spijkerbroek.php]
 	MAIN --> CORE[class-bso-plugin.php]
 	CORE --> HOOKS[Hook wiring actief]
-	HOOKS --> AJAX[bso_dashboard_data placeholder]
+	HOOKS --> AJAX[bso_dashboard_data met tussenstand/eindstand]
 ```
 
 ---
@@ -379,24 +391,68 @@ sequenceDiagram
 Toegevoegde testset:
 
 - `tests/regression/score_engine_golden_test.php`
+- `tests/regression/runtime_score_engine_db_test.php`
 - `tests/golden/score_engine_multiround_hr.json`
+- `tests/golden/score_engine_tiebreak_equal_cumulative.json`
+- `tests/golden/score_engine_zero_production.json`
+- `tests/golden/score_engine_extreme_resignation_impact.json`
 
 Doel:
 
 - formule-uitkomsten vastzetten als golden baseline
 - regressie detecteren op omzet/winst/marktaandeel/ranking/cumulatieve score
 - scenario over meerdere rondes met HR resignation (`effective_round`) valideren
+- runtime-uitkomst van plugin score-engine vergelijken met golden expected rows
 
 Uitvoeren:
 
 ```bash
-php tests/regression/score_engine_golden_test.php
+php tests/regression/score_engine_golden_test.php --formula-version=v1
 ```
 
 Golden baseline opnieuw genereren (bewust bij functionele wijziging):
 
 ```bash
-php tests/regression/score_engine_golden_test.php --update-golden
+php tests/regression/score_engine_golden_test.php --update-golden --formula-version=v1 --accept-golden-update=yes --update-reason="korte omschrijving"
+```
+
+### 11.2 Golden Update Protocol (T14)
+
+Verplicht protocol voor formulewijzigingen:
+
+1. Valideer bronmodelwijziging (Game_Control.xls) en leg operatorvolgorde vast.
+2. Verhoog `formula_version` in code en in fixture `meta.formula_version`.
+3. Draai eerst regressie zonder update:
+
+```bash
+php tests/regression/score_engine_golden_test.php --formula-version=vX
+```
+
+4. Pas code aan totdat mismatches verklaarbaar zijn.
+5. Update golden alleen met expliciete bevestiging en reden:
+
+```bash
+php tests/regression/score_engine_golden_test.php --update-golden --formula-version=vX --accept-golden-update=yes --update-reason="formula vX aligned with source model"
+```
+
+6. Draai regressie opnieuw en verifieer groene run.
+7. Bewaar in elke fixture-meta minimaal:
+	- `formula_version`
+	- `source_model`
+	- `last_updated_at`
+	- `last_update_reason`
+	- `updated_by`
+
+Runtime-test op echte WordPress-tabellen (vereist pad naar `wp-load.php`):
+
+```bash
+php tests/regression/runtime_score_engine_db_test.php --wp-load=/absolute/path/to/wp-load.php
+```
+
+Specifieke fixture draaien:
+
+```bash
+php tests/regression/runtime_score_engine_db_test.php --wp-load=/absolute/path/to/wp-load.php --fixture=score_engine_multiround_hr.json
 ```
 
 ---
