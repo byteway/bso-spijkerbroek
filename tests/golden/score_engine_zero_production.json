@@ -1,0 +1,112 @@
+{
+    "name": "zero production edge case",
+    "parameters": {
+        "target_price_theme_a": 75,
+        "target_price_theme_b": 95,
+        "target_price_theme_c": 115,
+        "production_cost": 15,
+        "hiring_cost": 50,
+        "layoff_cost": 20,
+        "default_employees": 10
+    },
+    "initial_employees": {
+        "1": 10,
+        "2": 10,
+        "3": 10
+    },
+    "approved_resignations": [],
+    "rounds": [
+        {
+            "round_id": 1,
+            "turn_number": 1,
+            "base_round_demand": 70000,
+            "commitments": [
+                {
+                    "organization_id": 1,
+                    "theme": "B",
+                    "price_jeans": 95,
+                    "advertisement_tv": 220,
+                    "advertisement_newspaper": 100,
+                    "advertisement_family_weekly": 120,
+                    "advertisement_luxury_weekly": 80,
+                    "marketing_research": 100,
+                    "production_segment_1": 0,
+                    "production_segment_2": 0,
+                    "production_segment_3": 0,
+                    "hiring_staff": 0,
+                    "layoff_staff": 0
+                },
+                {
+                    "organization_id": 2,
+                    "theme": "B",
+                    "price_jeans": 97,
+                    "advertisement_tv": 200,
+                    "advertisement_newspaper": 90,
+                    "advertisement_family_weekly": 100,
+                    "advertisement_luxury_weekly": 70,
+                    "marketing_research": 80,
+                    "production_segment_1": 3800,
+                    "production_segment_2": 3200,
+                    "production_segment_3": 2500,
+                    "hiring_staff": 0,
+                    "layoff_staff": 0
+                },
+                {
+                    "organization_id": 3,
+                    "theme": "B",
+                    "price_jeans": 93,
+                    "advertisement_tv": 210,
+                    "advertisement_newspaper": 95,
+                    "advertisement_family_weekly": 110,
+                    "advertisement_luxury_weekly": 75,
+                    "marketing_research": 90,
+                    "production_segment_1": 3600,
+                    "production_segment_2": 3300,
+                    "production_segment_3": 2400,
+                    "hiring_staff": 0,
+                    "layoff_staff": 0
+                }
+            ]
+        }
+    ],
+    "expected": {
+        "rows": [
+            {
+                "round_id": 1,
+                "turn_number": 1,
+                "organization_id": 1,
+                "rank_position": 3,
+                "turnover": 0,
+                "profit": -620,
+                "market_index": 0.344736,
+                "cumulative_score": -620,
+                "total_employees": 10,
+                "sale": 0
+            },
+            {
+                "round_id": 1,
+                "turn_number": 1,
+                "organization_id": 2,
+                "rank_position": 1,
+                "turnover": 921500,
+                "profit": 778460,
+                "market_index": 0.3243,
+                "cumulative_score": 778460,
+                "total_employees": 10,
+                "sale": 9500
+            },
+            {
+                "round_id": 1,
+                "turn_number": 1,
+                "organization_id": 3,
+                "rank_position": 2,
+                "turnover": 864900,
+                "profit": 724820,
+                "market_index": 0.330964,
+                "cumulative_score": 724820,
+                "total_employees": 10,
+                "sale": 9300
+            }
+        ]
+    }
+}

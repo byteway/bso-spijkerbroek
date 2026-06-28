@@ -1,1 +1,0 @@
-<?php class BSO_Database {public static function table_names(){return [];}}

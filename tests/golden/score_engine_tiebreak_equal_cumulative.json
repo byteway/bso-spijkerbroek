@@ -1,0 +1,145 @@
+{
+    "name": "tie-break with equal cumulative score",
+    "parameters": {
+        "target_price_theme_a": 75,
+        "target_price_theme_b": 95,
+        "target_price_theme_c": 115,
+        "production_cost": 15,
+        "hiring_cost": 50,
+        "layoff_cost": 20,
+        "default_employees": 10
+    },
+    "initial_employees": {
+        "1": 10,
+        "2": 10
+    },
+    "approved_resignations": [],
+    "rounds": [
+        {
+            "round_id": 1,
+            "turn_number": 1,
+            "base_round_demand": 60000,
+            "commitments": [
+                {
+                    "organization_id": 1,
+                    "theme": "A",
+                    "price_jeans": 80,
+                    "advertisement_tv": 200,
+                    "advertisement_newspaper": 70,
+                    "advertisement_family_weekly": 90,
+                    "advertisement_luxury_weekly": 60,
+                    "marketing_research": 80,
+                    "production_segment_1": 4000,
+                    "production_segment_2": 3000,
+                    "production_segment_3": 2000,
+                    "hiring_staff": 0,
+                    "layoff_staff": 0
+                },
+                {
+                    "organization_id": 2,
+                    "theme": "A",
+                    "price_jeans": 74,
+                    "advertisement_tv": 260,
+                    "advertisement_newspaper": 90,
+                    "advertisement_family_weekly": 100,
+                    "advertisement_luxury_weekly": 80,
+                    "marketing_research": 80,
+                    "production_segment_1": 4500,
+                    "production_segment_2": 3200,
+                    "production_segment_3": 1900,
+                    "hiring_staff": 0,
+                    "layoff_staff": 0
+                }
+            ]
+        },
+        {
+            "round_id": 2,
+            "turn_number": 2,
+            "base_round_demand": 60000,
+            "commitments": [
+                {
+                    "organization_id": 1,
+                    "theme": "A",
+                    "price_jeans": 70.5,
+                    "advertisement_tv": 280,
+                    "advertisement_newspaper": 100,
+                    "advertisement_family_weekly": 90,
+                    "advertisement_luxury_weekly": 80,
+                    "marketing_research": 80,
+                    "production_segment_1": 4200,
+                    "production_segment_2": 3100,
+                    "production_segment_3": 2000,
+                    "hiring_staff": 0,
+                    "layoff_staff": 0
+                },
+                {
+                    "organization_id": 2,
+                    "theme": "A",
+                    "price_jeans": 70.7,
+                    "advertisement_tv": 170,
+                    "advertisement_newspaper": 80,
+                    "advertisement_family_weekly": 80,
+                    "advertisement_luxury_weekly": 70,
+                    "marketing_research": 90,
+                    "production_segment_1": 4300,
+                    "production_segment_2": 3200,
+                    "production_segment_3": 2100,
+                    "hiring_staff": 0,
+                    "layoff_staff": 0
+                }
+            ]
+        }
+    ],
+    "expected": {
+        "rows": [
+            {
+                "round_id": 1,
+                "turn_number": 1,
+                "organization_id": 1,
+                "rank_position": 1,
+                "turnover": 720000,
+                "profit": 584500,
+                "market_index": 0.468565,
+                "cumulative_score": 584500,
+                "total_employees": 10,
+                "sale": 9000
+            },
+            {
+                "round_id": 1,
+                "turn_number": 1,
+                "organization_id": 2,
+                "rank_position": 2,
+                "turnover": 710400,
+                "profit": 565790,
+                "market_index": 0.531435,
+                "cumulative_score": 565790,
+                "total_employees": 10,
+                "sale": 9600
+            },
+            {
+                "round_id": 2,
+                "turn_number": 2,
+                "organization_id": 1,
+                "rank_position": 2,
+                "turnover": 655650,
+                "profit": 515520,
+                "market_index": 0.524796,
+                "cumulative_score": 1100020,
+                "total_employees": 10,
+                "sale": 9300
+            },
+            {
+                "round_id": 2,
+                "turn_number": 2,
+                "organization_id": 2,
+                "rank_position": 1,
+                "turnover": 678720,
+                "profit": 534230,
+                "market_index": 0.475204,
+                "cumulative_score": 1100020,
+                "total_employees": 10,
+                "sale": 9600
+            }
+        ]
+    }
+}

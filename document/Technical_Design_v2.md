@@ -1,0 +1,419 @@
+# Technisch Ontwerp v2 - BSO Spijkerbroek
+
+**Plugin:** `bso-spijkerbroek`  
+**Documentversie:** 2.0.4  
+**Status:** In opbouw (implementatiegericht)  
+**Datum:** 28 juni 2026  
+**Doel:** 1 centrale technische blauwdruk voor stapsgewijze realisatie
+
+---
+
+## 1. Documentbesturing
+
+### 1.1 Versiebeheer
+
+| Versie | Datum | Wijziging | Auteur |
+|--------|-------|-----------|--------|
+| 2.0.0 | 2026-06-28 | Eerste gestroomlijnde versie op basis van Technical_Design + Game_Control | Copilot |
+| 2.0.1 | 2026-06-28 | T05 geimplementeerd: score-engine rondeberekening + vullen `bso_round_scores` | Copilot |
+| 2.0.2 | 2026-06-28 | T06 geimplementeerd: dashboard endpoint leest en toont tussenstand/eindstand uit `bso_round_scores` | Copilot |
+| 2.0.3 | 2026-06-28 | T07 geimplementeerd: HR resignation verwerkt bij rondeafsluiting en doorwerking naar personeelscapaciteit | Copilot |
+| 2.0.4 | 2026-06-28 | T08 geimplementeerd: golden regressietests en multiround HR-scenario toegevoegd | Copilot |
+
+### 1.2 Projectstatus
+
+| Onderdeel | Status | Opmerking |
+|-----------|--------|-----------|
+| Basis plugin bootstrap | Basis gereed | Runtime klasse + hook wiring aanwezig |
+| Datamodel ontwerp | Geimplementeerd basis | dbDelta schema + parameter seeds actief |
+| Scorelogica ontwerp | Geimplementeerd basis | v1-formule actief, bronbladvalidatie blijft open |
+| Admin UI | Niet gestart | Alleen concept |
+| Frontend formulieren | Niet gestart | Alleen concept |
+| API/AJAX laag | Geimplementeerd basis | Dashboard endpoint levert tussenstand/eindstand payload uit round scores |
+
+### 1.3 Werkboard (voor uitvoering)
+
+| ID | Taak | Prioriteit | Status | Doelversie |
+|----|------|------------|--------|------------|
+| T01 | `class-bso-plugin.php` toevoegen + hook wiring | Hoog | Gereed | v2.1 |
+| T02 | Activator/deactivator implementeren | Hoog | Gereed | v2.1 |
+| T03 | DB tabellen aanmaken met `dbDelta` | Hoog | Gereed | v2.1 |
+| T04 | Commitment inputflow + validatie | Hoog | Gereed | v2.2 |
+| T05 | Score engine (rondeberekening) | Hoog | Gereed | v2.3 |
+| T06 | Dashboard tussenstand/eindstand | Midden | Gereed | v2.3 |
+| T07 | HR resignation workflow | Midden | Gereed | v2.4 |
+| T08 | Testset + regressiechecks formules | Hoog | Gereed | v2.4 |
+
+---
+
+## 2. Scope en uitgangspunten
+
+Deze versie combineert:
+
+- architectuur en componentverdeling
+- spelinvoer, scoreketen en formulelogica
+- implementatiestappen richting werkende WordPress-plugin
+
+### Kernuitgangspunten
+
+1. Turn-based game met immutable afgesloten rondes.
+2. Per organisatie exact 1 commitment per ronde.
+3. Score is cumulatief over rondes.
+4. Personeelseffecten zijn vertraagd in de tijd.
+5. Formules moeten reproduceerbaar versioned worden opgeslagen.
+
+---
+
+## 3. Huidige situatie (as-is)
+
+### 3.1 Feitelijke code-status
+
+- `bso-spijkerbroek.php` bestaat en probeert runtime te starten.
+- `includes/class-bso-plugin.php` bestaat met basis hook wiring.
+- activator/deactivator hebben nu minimale callable methods.
+- `uninstall.php` is placeholder.
+- `assets/js/admin.js` en `assets/js/public.js` pollen op `bso_dashboard_data` (placeholder actief).
+- CSS-bestanden zijn placeholders.
+
+```mermaid
+graph TD
+	WP[WordPress] --> MAIN[bso-spijkerbroek.php]
+	MAIN --> CORE[class-bso-plugin.php]
+	CORE --> HOOKS[Hook wiring actief]
+	HOOKS --> AJAX[bso_dashboard_data placeholder]
+```
+
+---
+
+## 4. Doelarchitectuur (to-be)
+
+```mermaid
+graph LR
+	B[Bootstrap] --> C[Core Plugin]
+	C --> ADM[Admin Module]
+	C --> PUB[Frontend Module]
+	C --> API[REST/AJAX Module]
+	C --> ENG[Score Engine]
+	C --> REP[Repository Layer]
+	REP --> DB[(Custom Tables)]
+```
+
+### 4.1 Technische lagen
+
+1. **Bootstraplaag**
+   - constants, includes, runtime start
+2. **Applicatielaag**
+   - game services, validatie, use-cases
+3. **Datalaag**
+   - repositories, SQL, migraties
+4. **Presentatielaag**
+   - admin pagina's, shortcodes, dashboardrendering
+
+### 4.2 Aanbevolen kernclasses
+
+- `BSO_Plugin`
+- `BSO_Game_Program_Service`
+- `BSO_Commitment_Service`
+- `BSO_HR_Request_Service`
+- `BSO_Scoring_Engine`
+- `BSO_Round_Dashboard_Service`
+- repositoryklassen per entiteit
+
+---
+
+## 5. Datamodel (samengevoegd)
+
+### 5.1 Kernentiteiten
+
+- `games`
+- `game_rounds`
+- `organizations`
+- `players`
+- `commitments`
+- `round_scores`
+- `game_parameters`
+- `hr_requests`
+
+```mermaid
+erDiagram
+	GAME ||--o{ GAME_ROUND : has
+	GAME ||--o{ ORGANIZATION : has
+	ORGANIZATION ||--o{ PLAYER : has
+	GAME_ROUND ||--o{ COMMITMENT : receives
+	ORGANIZATION ||--o{ COMMITMENT : submits
+	GAME_ROUND ||--o{ ROUND_SCORE : yields
+	ORGANIZATION ||--o{ ROUND_SCORE : gets
+	GAME ||--o{ GAME_PARAMETER : configures
+	GAME ||--o{ HR_REQUEST : manages
+```
+
+### 5.2 Kritieke constraints
+
+- unieke key op `(game_id, round_id, organization_id)` in commitments
+- ronde-lock voorkomt mutaties na sluiting
+- `effective_round` op personeelsmutaties
+- scoreberekening logt `formula_version`
+
+---
+
+## 6. Invoer- en spelproces
+
+## 6.1 Programmaflow
+
+```mermaid
+flowchart TD
+	A[Game start] --> B[Kies duur: kort/lang]
+	B --> C[Initialiseer rondes]
+	C --> D[Open ronde N]
+	D --> E[Commitments verzamelen]
+	E --> F[Ronde sluiten]
+	F --> G[Score berekenen]
+	G --> H[Tussenstand tonen]
+	H --> I{Laatste ronde?}
+	I -- Nee --> D
+	I -- Ja --> J[Eindstand + winnaar]
+```
+
+## 6.2 Commitment invoer (P1-Investment)
+
+Invoerblokken:
+
+- thema A/B/C
+- prijs
+- reclame per medium
+- productie per broektype
+- personeelsmutaties
+- distributievorm
+- marketing research
+
+```mermaid
+flowchart LR
+	I1[Invoer organisatie] --> I2[Valideer]
+	I2 --> I3[Opslaan commitment]
+	I3 --> I4[Lock bij ronde-sluiting]
+```
+
+## 6.3 HR ontslagproces
+
+```mermaid
+flowchart TD
+	A[Resignation aanvraag] --> B[Verplicht volledig?]
+	B -- Nee --> C[Afwijzen]
+	B -- Ja --> D[Game Control beoordeling]
+	D -- Afgekeurd --> E[Geen wijziging]
+	D -- Goedgekeurd --> F[Inplannen effective_round]
+```
+
+---
+
+## 7. Score-engine en formuleketen
+
+## 7.1 Rekenvolgorde per ronde
+
+```mermaid
+flowchart TD
+	A[Commitments ronde N] --> B[Prijsblok]
+	B --> C[Reclameblok]
+	C --> D[Capaciteitsblok personeel/productie]
+	D --> E[Afzetberekening]
+	E --> F[Omzetberekening]
+	F --> G[Kostenberekening]
+	G --> H[Winst + marktaandeel]
+	H --> I[Opslaan round_scores]
+```
+
+## 7.2 Kernformules (uit bronmodel)
+
+$$
+omzet = prijs \times afzet
+$$
+
+$$
+winst = omzet - kosten
+$$
+
+$$
+varkost = (prijs \times 0.2) + prijs + 15
+$$
+
+$$
+verschil = prijs - richtprijs
+$$
+
+Bronnotatie prijseffect:
+
+$$
+effect =
+\begin{cases}
+|verschil \times 2| + richtprijs, & verschil > 0 \\
+|verschil| + richtprijs, & anders
+\end{cases}
+$$
+
+Bronnotatie reclamefactor:
+
+$$
+recfac = manvrouw \times welstandsklasse \times mediumbereik \times reclameuitgaven
+$$
+
+### 7.3 Doorwerking naar score
+
+- prijs en reclame beïnvloeden afzet en marktaandeel
+- productie en personeel begrenzen maximale verkoop
+- winst en marktaandeel gaan naar ronde-score
+- eindscore is cumulatie van alle ronde-scores
+
+```mermaid
+sequenceDiagram
+	participant C as Commitment
+	participant E as Score Engine
+	participant R as Round Score
+	participant T as Tussenstand
+	participant F as Eindstand
+
+	C->>E: Input ronde N
+	E->>R: Bereken scorecomponenten
+	R->>T: Update actuele ranking
+	R->>F: Cumulatief optellen
+```
+
+---
+
+## 8. API en UI-contracten
+
+### 8.1 Aanbevolen endpoints
+
+| Endpoint/action | Gebruik |
+|-----------------|---------|
+| `POST /commitments` | invoer per organisatie/ronde |
+| `POST /hr-requests` | ontslagaanvraag |
+| `GET /round-state` | actieve ronde + lockstatus |
+| `GET /scores` | tussenstand/eindstand |
+| `GET /dashboard` | polling payload voor UI |
+
+### 8.2 Frontendcontract
+
+- formulieren met nonce
+- server-side validatie als bron van waarheid
+- duidelijk statusbericht bij lock of fout
+
+### 8.3 Admincontract
+
+- ronde openen/sluiten
+- commitments inzien
+- HR-aanvragen accorderen/weigeren
+- dashboard publicatie per ronde
+
+---
+
+## 9. Security en betrouwbaarheid
+
+- capability checks (`manage_options`) voor adminacties
+- nonce op alle muterende requests
+- prepared statements en escaping
+- transactiegrenzen rond scoreberekening
+- idempotente verwerking per commitment key
+- fallback/backoff voor dashboard polling
+
+---
+
+## 10. Implementatieplan per release
+
+## v2.1 - Foundation
+
+- runtimeklasse toevoegen
+- activator/deactivator invullen
+- tabellen + indexes aanmaken
+- minimale admin menu-structuur
+
+**Definition of Done v2.1**
+
+- plugin activeert zonder fatale fout
+- DB schema bestaat
+- healthcheck pagina toont basisstatus
+
+## v2.2 - Input en rondebeheer
+
+- commitmentformulier + opslag
+- ronde open/close workflow
+- basisvalidatie en lockgedrag
+
+**Definition of Done v2.2**
+
+- 1 volledige ronde kan worden ingevoerd en afgesloten
+
+## v2.3 - Score en dashboards
+
+- score engine implementeren
+- tussenstand en eindstand renderen
+- dashboard endpoint koppelen aan polling JS
+
+**Definition of Done v2.3**
+
+- dashboard toont consistente round_scores
+
+## v2.4 - Hardening
+
+- formulevalidatie met golden testdata
+- HR resignation workflow volledig
+- audittrail en foutlogging
+
+**Definition of Done v2.4**
+
+- regressietests groen
+- formule-uitkomsten reproduceerbaar
+
+---
+
+## 11. Openstaande beslissingen
+
+1. Definitieve operatorvolgorde van prijsfactorformule bevestigen op bronbestandniveau.
+2. Exacte tie-breaker-regels bij gelijk marktaandeel/winst.
+3. Keuze REST-only of hybride REST/AJAX.
+4. Hoe teamrollen technisch aan WP-users worden gekoppeld (custom table vs user meta uitgebreid model).
+
+---
+
+## 11.1 Regressietests (golden baseline)
+
+Toegevoegde testset:
+
+- `tests/regression/score_engine_golden_test.php`
+- `tests/golden/score_engine_multiround_hr.json`
+
+Doel:
+
+- formule-uitkomsten vastzetten als golden baseline
+- regressie detecteren op omzet/winst/marktaandeel/ranking/cumulatieve score
+- scenario over meerdere rondes met HR resignation (`effective_round`) valideren
+
+Uitvoeren:
+
+```bash
+php tests/regression/score_engine_golden_test.php
+```
+
+Golden baseline opnieuw genereren (bewust bij functionele wijziging):
+
+```bash
+php tests/regression/score_engine_golden_test.php --update-golden
+```
+
+---
+
+## 12. Bijwerksjabloon voor volgende iteraties
+
+Gebruik dit blok bij elke update van dit document:
+
+```text
+Nieuwe versie:
+Datum:
+Wat is afgerond:
+Wat is gewijzigd in architectuur/formules:
+Nieuwe risico's:
+Volgende concrete taken:
+```
+
+---
+
+*Dit is de leidende v2 voor stapsgewijze implementatie van bso-spijkerbroek.*

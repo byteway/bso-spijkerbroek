@@ -1,1 +1,0 @@
-<?php class BSO_Commitment_Form {}
