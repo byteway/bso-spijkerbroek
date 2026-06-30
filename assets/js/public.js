@@ -14,6 +14,10 @@ document.addEventListener('DOMContentLoaded', function () {
   return;
  }
 
+ function renderMessage(type, text) {
+  return '<p class="bso-dashboard-message bso-dashboard-message--' + type + '">' + text + '</p>';
+ }
+
  function loadTarget(container) {
   const params = new URLSearchParams({ action: 'bso_dashboard_data' });
   const gameId = container.dataset.gameId || '';
@@ -24,6 +28,9 @@ document.addEventListener('DOMContentLoaded', function () {
 
   fetch(ajaxurl + '?' + params.toString())
    .then(function (response) {
+    if (!response.ok) {
+     throw new Error('HTTP ' + response.status);
+    }
     return response.json();
    })
    .then(function (payload) {
@@ -32,10 +39,10 @@ document.addEventListener('DOMContentLoaded', function () {
      return;
     }
 
-    container.innerHTML = '<p>Scoredata is momenteel niet beschikbaar.</p>';
+    container.innerHTML = renderMessage('warning', 'Er is momenteel geen scoredata beschikbaar.');
    })
    .catch(function () {
-    container.innerHTML = '<p>Scoredata kon niet worden geladen.</p>';
+    container.innerHTML = renderMessage('error', 'Scoredata kon niet worden geladen. Controleer je verbinding en probeer opnieuw.');
    });
  }
 

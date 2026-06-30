@@ -132,6 +132,10 @@ class BSO_Plugin {
 
         $error = isset($_GET['bso_error']) ? sanitize_text_field($_GET['bso_error']) : '';
         $success = isset($_GET['bso_success']) ? sanitize_text_field($_GET['bso_success']) : '';
+        $return_url = home_url('/');
+        if (isset($_SERVER['REQUEST_URI'])) {
+            $return_url = home_url(wp_unslash((string) $_SERVER['REQUEST_URI']));
+        }
 
         ob_start();
         ?>
@@ -162,6 +166,7 @@ class BSO_Plugin {
             <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>">
                 <?php wp_nonce_field('bso_submit_commitment'); ?>
                 <input type="hidden" name="action" value="bso_submit_commitment" />
+                <input type="hidden" name="bso_return_url" value="<?php echo esc_attr($return_url); ?>" />
 
                 <?php if ($show_manual_ids): ?>
                     <p>
@@ -339,16 +344,21 @@ class BSO_Plugin {
             wp_die('Je moet ingelogd zijn om een commitment in te dienen.');
         }
 
+        $return_url = $this->resolve_frontend_return_url($_POST);
+
         check_admin_referer('bso_submit_commitment');
 
         try {
             $data = $this->validate_commitment_input($_POST);
+            if (!$this->user_can_access_organization($data['game_id'], $data['organization_id'])) {
+                throw new Exception('Je hebt geen toegang tot dit team.');
+            }
             $this->assert_round_open($data['game_id'], $data['round_id']);
             $this->save_commitment($data);
             $this->recalculate_round_scores($data['game_id'], $data['round_id']);
-            $this->redirect_with_status('1', '');
+            $this->redirect_with_status('1', '', $return_url);
         } catch (Exception $e) {
-            $this->redirect_with_status('', $e->getMessage());
+            $this->redirect_with_status('', $e->getMessage(), $return_url);
         }
     }
 
@@ -759,6 +769,9 @@ class BSO_Plugin {
             }
 
             $data = $this->validate_commitment_input($payload);
+            if (!$this->user_can_access_organization($data['game_id'], $data['organization_id'])) {
+                return new WP_Error('bso_rest_forbidden_org', 'Je hebt geen toegang tot dit team.', array('status' => 403));
+            }
             $this->assert_round_open($data['game_id'], $data['round_id']);
             $this->save_commitment($data);
             $this->recalculate_round_scores($data['game_id'], $data['round_id']);
@@ -834,6 +847,10 @@ class BSO_Plugin {
             $round_id = $this->positive_int($payload, 'round_id', 'Round ID');
             $organization_id = $this->positive_int($payload, 'organization_id', 'Organization ID');
             $requested_count = $this->non_negative_int($payload, 'requested_count', 'Requested count');
+
+            if (!$this->user_can_access_organization($game_id, $organization_id)) {
+                return new WP_Error('bso_rest_forbidden_org', 'Je hebt geen toegang tot dit team.', array('status' => 403));
+            }
 
             $request_type = isset($payload['request_type']) ? sanitize_text_field($payload['request_type']) : 'resignation';
             if ($request_type === '') {
@@ -961,7 +978,7 @@ class BSO_Plugin {
         }
 
         if (($row['status'] ?? '') !== 'open') {
-            throw new Exception('Ronde is gesloten; commitment kan niet meer worden gewijzigd.');
+            throw new Exception('Deze ronde is gesloten; je kunt geen wijzigingen meer opslaan.');
         }
     }
 
@@ -1562,22 +1579,41 @@ class BSO_Plugin {
         return round($value, 2);
     }
 
-    private function redirect_with_status($success, $error_message) {
+    private function redirect_with_status($success, $error_message, $target = '') {
         $args = array();
         if ($success !== '') {
             $args['bso_success'] = $success;
         }
         if ($error_message !== '') {
-			$args['bso_error'] = $error_message;
+            $args['bso_error'] = $error_message;
         }
 
-        $target = wp_get_referer();
+        if ($target === '') {
+            $target = wp_get_referer();
+        }
         if (!$target) {
             $target = home_url('/');
         }
 
+        $target = remove_query_arg(array('bso_success', 'bso_error'), $target);
         wp_safe_redirect(add_query_arg($args, $target));
         exit;
+    }
+
+    private function resolve_frontend_return_url(array $input) {
+        if (isset($input['bso_return_url'])) {
+            $candidate = esc_url_raw(wp_unslash((string) $input['bso_return_url']));
+            if ($candidate !== '') {
+                return wp_validate_redirect($candidate, home_url('/'));
+            }
+        }
+
+        $referer = wp_get_referer();
+        if ($referer) {
+            return $referer;
+        }
+
+        return home_url('/');
     }
 
     private function redirect_admin_dashboard($game_id, $success_message, $error_message) {
@@ -2026,6 +2062,46 @@ class BSO_Plugin {
         );
     }
 
+    private function user_can_access_organization($game_id, $organization_id, $user_id = 0) {
+        if ((int) $game_id <= 0 || (int) $organization_id <= 0) {
+            return false;
+        }
+
+        if ($user_id <= 0) {
+            $user_id = get_current_user_id();
+        }
+
+        if ((int) $user_id <= 0) {
+            return false;
+        }
+
+        if (user_can($user_id, 'manage_options')) {
+            return true;
+        }
+
+        global $wpdb;
+
+        $players_table = $wpdb->prefix . 'bso_players';
+        $orgs_table = $wpdb->prefix . 'bso_organizations';
+
+        $assignment_id = $wpdb->get_var(
+            $wpdb->prepare(
+                "SELECT p.id
+                 FROM {$players_table} p
+                 INNER JOIN {$orgs_table} o ON o.id = p.organization_id
+                 WHERE p.wp_user_id = %d
+                   AND p.organization_id = %d
+                   AND o.game_id = %d
+                 LIMIT 1",
+                (int) $user_id,
+                (int) $organization_id,
+                (int) $game_id
+            )
+        );
+
+        return !empty($assignment_id);
+    }
+
     private function normalize_admin_datetime($value) {
         $value = trim((string) $value);
         if ($value === '') {
@@ -2267,7 +2343,7 @@ class BSO_Plugin {
 
         if (!$context) {
             wp_send_json_success(array(
-                'html' => '<div class="bso-dashboard"><h3>Tussenstand</h3><p>Geen scoredata beschikbaar.</p></div>',
+                'html' => '<div class="bso-dashboard"><h3>Tussenstand</h3><p class="bso-dashboard-message bso-dashboard-message--warning">Er is momenteel geen scoredata beschikbaar.</p></div>',
                 'status' => 'empty',
                 'phase' => 'T06-dashboard-scores',
                 'summary' => array(),
@@ -2540,7 +2616,7 @@ class BSO_Plugin {
 
     private function render_dashboard_table(array $rows, $table_type, $highlight_organization_id = 0) {
         if (empty($rows)) {
-            return '<p>Geen scoredata beschikbaar voor deze ronde.</p>';
+            return '<p class="bso-dashboard-message bso-dashboard-message--warning">Er is momenteel geen scoredata beschikbaar voor deze ronde.</p>';
         }
 
         $html = '<table class="widefat striped bso-score-table bso-score-table-' . esc_attr($table_type) . '">';

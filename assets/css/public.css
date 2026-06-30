@@ -262,6 +262,28 @@
 	color: var(--bso-warning);
 }
 
+.bso-dashboard-message {
+	margin: 10px 0;
+	padding: 12px 14px;
+	border-radius: 12px;
+	border: 1px solid rgba(22, 33, 45, 0.12);
+	background: #f8fafc;
+	color: var(--bso-ink);
+	font-weight: 600;
+}
+
+.bso-dashboard-message--warning {
+	background: #fff6e8;
+	border-color: rgba(217, 119, 6, 0.28);
+	color: #8a5400;
+}
+
+.bso-dashboard-message--error {
+	background: #fff1f2;
+	border-color: rgba(225, 29, 72, 0.26);
+	color: #9f1239;
+}
+
 .bso-team-dashboard--login,
 .bso-team-dashboard--empty {
 	padding: 20px 22px;

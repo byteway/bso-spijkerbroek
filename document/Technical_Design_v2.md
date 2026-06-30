@@ -1,9 +1,9 @@
 # Technisch Ontwerp v2 - BSO Spijkerbroek
 
 **Plugin:** `bso-spijkerbroek`  
-**Documentversie:** 2.1.6  
+**Documentversie:** 2.3.0  
 **Status:** In opbouw (implementatiegericht)  
-**Datum:** 28 juni 2026  
+**Datum:** 30 juni 2026  
 **Doel:** 1 centrale technische blauwdruk voor stapsgewijze realisatie
 
 ---
@@ -14,23 +14,37 @@
 
 | Versie | Datum | Wijziging | Auteur |
 |--------|-------|-----------|--------|
-| 2.0.0 | 2026-06-28 | Eerste gestroomlijnde versie op basis van Technical_Design + Game_Control | Copilot |
-| 2.0.1 | 2026-06-28 | T05 geimplementeerd: score-engine rondeberekening + vullen `bso_round_scores` | Copilot |
-| 2.0.2 | 2026-06-28 | T06 geimplementeerd: dashboard endpoint leest en toont tussenstand/eindstand uit `bso_round_scores` | Copilot |
-| 2.0.3 | 2026-06-28 | T07 geimplementeerd: HR resignation verwerkt bij rondeafsluiting en doorwerking naar personeelscapaciteit | Copilot |
-| 2.0.4 | 2026-06-28 | T08 geimplementeerd: golden regressietests en multiround HR-scenario toegevoegd | Copilot |
-| 2.0.5 | 2026-06-28 | Werkboard geactualiseerd en uitgebreid met CI + vervolgtaken na T08 | Copilot |
-| 2.0.6 | 2026-06-28 | T10 geimplementeerd: runtime DB regressietest tegen golden fixtures toegevoegd | Copilot |
-| 2.0.7 | 2026-06-28 | T11 geimplementeerd: admin rondebeheer UI met openen/sluiten/lock en statushandler | Copilot |
-| 2.0.8 | 2026-06-28 | T12 geimplementeerd: HR-aanvraagbeheer UI met approve/reject/reset en decision notes | Copilot |
-| 2.0.9 | 2026-06-28 | T13 geimplementeerd: REST API endpoints voor commitments, scores en hr-requests | Copilot |
-| 2.1.0 | 2026-06-28 | T14 geimplementeerd: formula-v2 validatieprotocol + afgedwongen golden update workflow | Copilot |
-| 2.1.1 | 2026-06-28 | T15 geimplementeerd: Game Setup UI voor games, rondes en organisaties | Copilot |
-| 2.1.2 | 2026-06-28 | T16 geimplementeerd: Player Setup UI voor koppeling van WP-gebruikers aan organisaties | Copilot |
-| 2.1.3 | 2026-06-28 | T17 geimplementeerd: Quick Start / Demo Setup voor snelle speelbare testconfiguratie | Copilot |
-| 2.1.4 | 2026-06-28 | Demo setup uitgebreid tot volledig speelbare testconfiguratie met snelle start | Copilot |
-| 2.1.5 | 2026-06-28 | T18 geimplementeerd: organisatiegericht frontend/teamdashboard voor spelers | Copilot |
-| 2.1.6 | 2026-06-28 | Game Ready werkboard + quick test stappen voor WordPress devsite toegevoegd | Copilot |
+| 2.0.0 | 2026-06-28 | Eerste gestroomlijnde versie op basis van Technical_Design + Game_Control | Byteway |
+| 2.0.1 | 2026-06-28 | T05 geimplementeerd: score-engine rondeberekening + vullen `bso_round_scores` | Byteway |
+| 2.0.2 | 2026-06-28 | T06 geimplementeerd: dashboard endpoint leest en toont tussenstand/eindstand uit `bso_round_scores` | Byteway |
+| 2.0.3 | 2026-06-28 | T07 geimplementeerd: HR resignation verwerkt bij rondeafsluiting en doorwerking naar personeelscapaciteit | Byteway |
+| 2.0.4 | 2026-06-28 | T08 geimplementeerd: golden regressietests en multiround HR-scenario toegevoegd | Byteway |
+| 2.0.5 | 2026-06-28 | Werkboard geactualiseerd en uitgebreid met CI + vervolgtaken na T08 | Byteway |
+| 2.0.6 | 2026-06-28 | T10 geimplementeerd: runtime DB regressietest tegen golden fixtures toegevoegd | Byteway |
+| 2.0.7 | 2026-06-28 | T11 geimplementeerd: admin rondebeheer UI met openen/sluiten/lock en statushandler | Byteway |
+| 2.0.8 | 2026-06-28 | T12 geimplementeerd: HR-aanvraagbeheer UI met approve/reject/reset en decision notes | Byteway |
+| 2.0.9 | 2026-06-28 | T13 geimplementeerd: REST API endpoints voor commitments, scores en hr-requests | Byteway |
+| 2.1.0 | 2026-06-28 | T14 geimplementeerd: formula-v2 validatieprotocol + afgedwongen golden update workflow | Byteway |
+| 2.1.1 | 2026-06-28 | T15 geimplementeerd: Game Setup UI voor games, rondes en organisaties | Byteway |
+| 2.1.2 | 2026-06-28 | T16 geimplementeerd: Player Setup UI voor koppeling van WP-gebruikers aan organisaties | Byteway |
+| 2.1.3 | 2026-06-28 | T17 geimplementeerd: Quick Start / Demo Setup voor snelle speelbare testconfiguratie | Byteway |
+| 2.1.4 | 2026-06-28 | Demo setup uitgebreid tot volledig speelbare testconfiguratie met snelle start | Byteway |
+| 2.1.5 | 2026-06-28 | T18 geimplementeerd: organisatiegericht frontend/teamdashboard voor spelers | Byteway |
+| 2.1.6 | 2026-06-28 | Game Ready werkboard + quick test stappen voor WordPress devsite toegevoegd | Byteway |
+| 2.1.7 | 2026-06-30 | T21 gevalideerd op devsite: teamcontext-afscherming, refresh-consistentie, ronde-lockgedrag en nette no-team melding | Byteway |
+| 2.1.8 | 2026-06-30 | T22 gevalideerd: responsive polish en lege-statencontrole op mobiel/desktop succesvol | Byteway |
+| 2.1.9 | 2026-06-30 | T23 afgerond: release checklist en handoff-notities voor beheerder gevalideerd | Byteway |
+| 2.2.0 | 2026-06-30 | Nieuw opleverblok T24-T29 toegevoegd; T24 overgeslagen en T25 gestart | Byteway |
+| 2.2.1 | 2026-06-30 | T25 uitgewerkt: security hardening checklist, controlescope en Definition of Done toegevoegd | Byteway |
+| 2.2.2 | 2026-06-30 | T25 eerste-pass code-audit ingevuld: nonce/capability/authz-status per endpoint + gaps vastgelegd | Byteway |
+| 2.2.3 | 2026-06-30 | T25 authz-fixes geimplementeerd voor commitment en HR REST/admin paden; checklist bijgewerkt | Byteway |
+| 2.2.4 | 2026-06-30 | T25 negatieve testmatrix toegevoegd voor ownership- en autorisatiecontroles | Byteway |
+| 2.2.5 | 2026-06-30 | T25-N01 gevalideerd: blokkade en geen DB-write bevestigd; UX-gap genoteerd (nette foutmelding ontbreekt) | Byteway |
+| 2.2.6 | 2026-06-30 | T25-N02 gevalideerd: submit zonder geldige nonce correct geweigerd | Byteway |
+| 2.2.7 | 2026-06-30 | T25-N03 gevalideerd: submit op gesloten ronde geblokkeerd; lockstate-melding ontbreekt voor gebruiker | Byteway |
+| 2.2.8 | 2026-06-30 | T25-N04 t/m T25-N08 op Pass; volledige T25 testmatrix 8/8 groen en T25 op Gereed gezet | Byteway |
+| 2.2.9 | 2026-06-30 | T26 gestart: UX/foutafhandeling verbeterd voor frontend submit redirects en dashboard polling fallbackmeldingen | Byteway |
+| 2.3.0 | 2026-06-30 | T26 afgerond: uniforme UX-copy + consistente warning/error styling in frontend en admin | Byteway |
 
 ### 1.2 Projectstatus
 
@@ -73,9 +87,20 @@
 |----|------|------------|--------|------------|
 | T19 | Devsite smoke test: demo setup, dashboard en commitmentflow | Hoog | In uitvoering (technische smoke groen, devsite-run pending) | Game Ready |
 | T20 | Shortcode en pagina plaatsen voor spelersdashboard | Hoog | Gereed | Game Ready |
-| T21 | Spelerpad testen: login, teamherkenning, commitment submit, refresh | Hoog | In uitvoering | Game Ready |
-| T22 | Responsive polish en lege-staten controle op mobiel/desktop | Midden | Niet gestart | Game Ready |
-| T23 | Release checklist en handoff-notities voor beheerder | Midden | Niet gestart | Game Ready |
+| T21 | Spelerpad testen: login, teamherkenning, commitment submit, refresh | Hoog | Gereed | Game Ready |
+| T22 | Responsive polish en lege-staten controle op mobiel/desktop | Midden | Gereed | Game Ready |
+| T23 | Release checklist en handoff-notities voor beheerder | Midden | Gereed | Game Ready |
+
+### 1.5 Werkboard - Productieklare Oplevering
+
+| ID | Taak | Prioriteit | Status | Doelversie |
+|----|------|------------|--------|------------|
+| T24 | T19 formaliseren en sluiten (testrapportage + bewijs) | Hoog | Overgeslagen | Productieblok |
+| T25 | Security hardening check (nonce, capabilities, sanitization/escaping) | Hoog | Gereed | Productieblok |
+| T26 | UX en foutafhandeling polish (lock/no-team/no-data) | Midden | Gereed | Productieblok |
+| T27 | Release packaging (versie, changelog, artifact) | Midden | Niet gestart | Productieblok |
+| T28 | Beheerders-handoff compleet maken (runbook) | Midden | Niet gestart | Productieblok |
+| T29 | Go/No-Go gate met expliciete vrijgavecriteria | Hoog | Niet gestart | Productieblok |
 
 ---
 
@@ -488,6 +513,140 @@ Gebruik dit pad om snel te testen of de plugin Game Ready is op je devsite:
 6. Dien een commitment in en ververs de pagina om te zien of de opgeslagen waarden terugkomen.
 7. Open daarna `Rondebeheer` en sluit of lock de ronde om te verifiëren dat de frontend read-only wordt.
 8. Controleer in `HR-aanvraagbeheer` en het score-dashboard of de data synchroon blijft met de laatste actie.
+
+### 11.4 Resultaat T21 devsite-validatie (2026-06-30)
+
+- succes: gekoppelde speler ziet alleen eigen teamcontext
+- succes: commitmentflow blijft consistent na refresh
+- succes: gesloten ronde toont geen bewerkbare submitflow
+- succes: niet-gekoppelde gebruiker ziet geen teamdata maar wel een nette melding
+
+### 11.5 Resultaat T22 responsive/lege-staten (2026-06-30)
+
+- succes: responsive polish op mobiel en desktop gevalideerd
+- succes: lege-staten tonen correcte en nette feedback zonder layoutbreuk
+
+### 11.6 Resultaat T23 release/handoff (2026-06-30)
+
+- succes: release checklist is doorlopen en vastgelegd
+- succes: handoff-notities voor beheerder zijn aanwezig en bruikbaar
+
+### 11.7 Startnotitie Productieblok (2026-06-30)
+
+- T24 is overgeslagen op verzoek
+- T25 is gestart als actief werkspoor
+
+### 11.8 T25 Security Hardening Check (werkuitwerking)
+
+Doel van T25:
+
+- alle muterende paden afdichten op CSRF, privilege escalation, inputmisbruik en outputinjectie
+- server-side validatie en autorisatie leidend maken boven UI-state
+- security-controles herhaalbaar vastleggen als afvinkbare baseline
+
+Scope:
+
+- admin-acties: rondebeheer, HR-aanvraagbeheer, game setup, player setup, demo setup
+- frontend-acties: commitment submit en eventuele statusmutaties
+- API/AJAX-acties: REST-routes (commitments/scores/hr) en `bso_dashboard_data`
+- datalaag: inserts/updates/selects op custom tabellen
+
+#### 11.8.1 Controlematrix per aanvalsvector
+
+| Controlepunt | Verplichting | Acceptatiecriterium |
+|--------------|--------------|---------------------|
+| Nonce op mutaties | Verplicht op alle create/update/delete acties | Request zonder geldige nonce wordt geweigerd met duidelijke foutmelding |
+| Capability checks | Verplicht op adminmutaties | Alleen bevoegde rollen kunnen muteren; onbevoegde gebruiker krijgt 403/afwijzing |
+| AuthZ op teamcontext | Verplicht op frontend commitflow | Speler kan uitsluitend data van gekoppelde organisatie lezen/schrijven |
+| Input sanitization | Verplicht op alle externe input | Tekst via sanitize-functies, numeriek via strikte casting/range checks |
+| Output escaping | Verplicht bij render in admin/frontend | Variabele output wordt geescaped conform context (html/attr/url/js) |
+| SQL hardening | Verplicht in repositories/services | Queries gebruiken prepare/placeholders; geen string-concatenatie met ruwe input |
+| Lockstate afdwinging | Verplicht server-side | Gesloten/gelockte ronde blokkeert mutaties ook bij handmatige requests |
+| Idempotentie mutaties | Verplicht op commitment key | Dubbele submit levert update of nette conflictafhandeling zonder datacorruptie |
+| Foutafhandeling | Verplicht op alle mutaties | Geen gevoelige details in foutmeldingen; wel bruikbare user feedback |
+| Logging/audit basis | Verplicht voor adminbesluiten | Kritieke acties (approve/reject/lock) bevatten actor + timestamp + context |
+
+#### 11.8.2 Endpoint- en formulierchecklist
+
+| Onderdeel | Nonce | Capability/AuthZ | Sanitization | Escaping | SQL prepare | Lock/State guard | Status |
+|-----------|-------|------------------|--------------|----------|-------------|------------------|--------|
+| Admin: Rondebeheer (open/sluit/lock) | Gereed | Gereed (`manage_options`) | Gereed | Gereed | Gereed | Gereed | Gereed (eerste pass) |
+| Admin: HR-aanvraagbeheer (approve/reject/reset) | Gereed | Gereed (`manage_options`) | Gereed | Gereed | Gereed | n.v.t. | Gereed (eerste pass) |
+| Admin: Game Setup (games/rondes/orgs) | Gereed | Gereed (`manage_options`) | Gereed | Gereed | Gereed | Gereed | Gereed (eerste pass) |
+| Admin: Player Setup (koppeling WP-user/org) | Gereed | Gereed (`manage_options`) | Gereed | Gereed | Gereed | n.v.t. | Gereed (eerste pass) |
+| Admin: Demo Setup | Gereed | Gereed (`manage_options`) | Gereed | Gereed | Gereed | Gereed | Gereed (eerste pass) |
+| Frontend: commitment submit | Gereed | Gereed (ownership-check op game+organization toegevoegd) | Gereed | Gereed | Gereed | Gereed | Gereed (eerste pass) |
+| REST: commitments | Deels (WP REST-auth, geen expliciete nonce-check in callback) | Gereed (ownership-check op game+organization toegevoegd) | Gereed | n.v.t. (JSON) | Gereed | Gereed | Gereed (eerste pass) |
+| REST: hr-requests | Deels (WP REST-auth, geen expliciete nonce-check in callback) | Gereed: GET admin-only, POST met ownership-check op game+organization | Gereed | n.v.t. (JSON) | Gereed | n.v.t. | Gereed (eerste pass) |
+| REST: scores | n.v.t. (read) | Openbaar (`__return_true`) - functioneel toegestaan, securitybesluit expliciet houden | Gereed | n.v.t. (JSON) | Gereed | n.v.t. | Gereed (publieke read) |
+| AJAX: bso_dashboard_data | n.v.t. (read) | Openbaar via `wp_ajax_nopriv` - functioneel toegestaan | Gereed | n.v.t. (JSON) | Gereed | n.v.t. | Gereed (publieke read) |
+
+#### 11.8.3 Definition of Done T25
+
+- alle regels in 11.8.2 staan op `Gereed`
+- minimaal 1 negatieve test per mutatiepad geslaagd:
+	- zonder nonce
+	- zonder rechten
+	- met manipulatie van organization/teamcontext
+	- met gesloten ronde maar geforceerde submit
+- geen ongeescape output gevonden in admin/frontend voor user-gegenereerde data
+- geen ruwe SQL-stringbouw met externe input in muterende paden
+- bevindingen, fixes en resterende risico's vastgelegd in release-notities voor T25
+
+#### 11.8.4 Uitvoerstappen (praktisch)
+
+1. Inventariseer alle muterende handlers (admin postbacks, REST callbacks, AJAX actions).
+2. Markeer per handler de controles uit 11.8.1.
+3. Los eerst high-risk gaps op: nonce, capability/authz, lockstate, SQL prepare.
+4. Voer daarna output-escaping en foutafhandeling uniform door.
+5. Draai negatieve tests en leg resultaat per onderdeel vast in 11.8.2.
+6. Zet T25 op `Gereed` zodra alle criteria onder 11.8.3 zijn gehaald.
+
+#### 11.8.5 Eerste bevindingen en directe vervolgacties
+
+Afgeronde high-risk fixes:
+
+- Frontend commitment submit valideert nu ownership server-side op combinatie game+organization.
+- REST `POST /commitments` valideert nu ownership server-side en retourneert 403 bij mismatch.
+- REST `POST /hr-requests` valideert nu ownership server-side en retourneert 403 bij mismatch.
+
+Open vervolgactie voor T25:
+
+1. Beslissen of expliciete nonce-validatie in REST-callbacks gewenst is bovenop standaard WP REST-auth.
+2. UX-meldingen verder afstemmen op uniforme tekstset in T26.
+
+#### 11.8.6 Negatieve testmatrix (uitvoering T25)
+
+| Test-ID | Pad | Teststap | Verwacht resultaat | Resultaat |
+|--------|-----|----------|--------------------|-----------|
+| T25-N01 | Frontend `admin_post_bso_submit_commitment` | Ingelogde speler manipuleert verborgen `organization_id` naar ander team | Request geweigerd met nette foutmelding; geen DB-write | Pass (blokkade + geen write, maar nette foutmelding ontbreekt) |
+| T25-N02 | Frontend `admin_post_bso_submit_commitment` | Submit zonder geldige nonce | Request geweigerd door nonce-check | Pass |
+| T25-N03 | Frontend `admin_post_bso_submit_commitment` | Submit op gesloten ronde via handmatige POST | Request geweigerd met lockstate-melding | Pass (blokkade OK, maar geen melding zichtbaar) |
+| T25-N04 | REST `POST /bso/v1/commitments` | Ingelogde speler post payload met vreemd `organization_id` | HTTP 403 + foutcode `bso_rest_forbidden_org`; geen DB-write | Pass |
+| T25-N05 | REST `POST /bso/v1/commitments` | Niet-ingelogde call | HTTP 401/403 vanuit permission callback | Pass |
+| T25-N06 | REST `POST /bso/v1/hr-requests` | Ingelogde speler post payload met vreemd `organization_id` | HTTP 403 + foutcode `bso_rest_forbidden_org`; geen DB-write | Pass |
+| T25-N07 | REST `POST /bso/v1/hr-requests` | Niet-ingelogde call | HTTP 401/403 vanuit permission callback | Pass |
+| T25-N08 | REST `POST /bso/v1/hr-requests/(?P<id>)/status` | Niet-admin probeert statusupdate | HTTP 401/403 vanuit `manage_options` check | Pass |
+
+Uitvoernotitie:
+
+- zet `Resultaat` op `Pass` of `Fail` en noteer bij `Fail` direct de fixreferentie
+- bij 8x `Pass` kan T25 naar `Gereed` worden omgezet
+
+### 11.9 T26 UX/Foutafhandeling - voortgang
+
+Afgeronde verbeteringen in code:
+
+- Frontend commitmentformulier stuurt nu een expliciete `bso_return_url` mee, zodat fout/succesmeldingen terugkomen op de juiste pagina.
+- Submit-handler gebruikt nu een gevalideerde return-url fallbackketen (`bso_return_url` -> referer -> home).
+- Redirects schonen bestaande statusquery-parameters op voordat nieuwe meldingen worden toegevoegd.
+- Polling in zowel frontend als admindashboard heeft nu robuuste response-checks (`response.ok`) en nette warning/error fallbackmeldingen.
+- No-data meldingen in server-rendered dashboard-output gebruiken nu dezelfde warning message class als de pollingfallback.
+- Frontend en admin CSS bevatten nu consistente styling voor `bso-dashboard-message`, `--warning` en `--error`.
+
+T26 status:
+
+- `Gereed` (copy en foutafhandeling uniform doorgevoerd voor lock/no-data/error-paden)
 
 ---
 

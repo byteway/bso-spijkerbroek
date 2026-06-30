@@ -1,1 +1,23 @@
 
+.bso-dashboard-message {
+	margin: 8px 0;
+	padding: 10px 12px;
+	border-radius: 8px;
+	border: 1px solid #d1d5db;
+	background: #f8fafc;
+	color: #111827;
+	font-weight: 600;
+}
+
+.bso-dashboard-message--warning {
+	background: #fffbeb;
+	border-color: #fcd34d;
+	color: #92400e;
+}
+
+.bso-dashboard-message--error {
+	background: #fef2f2;
+	border-color: #fca5a5;
+	color: #991b1b;
+}
+
