@@ -71,9 +71,9 @@
 
 | ID | Taak | Prioriteit | Status | Doelversie |
 |----|------|------------|--------|------------|
-| T19 | Devsite smoke test: demo setup, dashboard en commitmentflow | Hoog | Niet gestart | Game Ready |
-| T20 | Shortcode en pagina plaatsen voor spelersdashboard | Hoog | Niet gestart | Game Ready |
-| T21 | Spelerpad testen: login, teamherkenning, commitment submit, refresh | Hoog | Niet gestart | Game Ready |
+| T19 | Devsite smoke test: demo setup, dashboard en commitmentflow | Hoog | In uitvoering (technische smoke groen, devsite-run pending) | Game Ready |
+| T20 | Shortcode en pagina plaatsen voor spelersdashboard | Hoog | Gereed | Game Ready |
+| T21 | Spelerpad testen: login, teamherkenning, commitment submit, refresh | Hoog | In uitvoering | Game Ready |
 | T22 | Responsive polish en lege-staten controle op mobiel/desktop | Midden | Niet gestart | Game Ready |
 | T23 | Release checklist en handoff-notities voor beheerder | Midden | Niet gestart | Game Ready |
 
