@@ -1,7 +1,7 @@
 # Technisch Ontwerp v2 - BSO Spijkerbroek
 
 **Plugin:** `bso-spijkerbroek`  
-**Documentversie:** 2.3.0  
+**Documentversie:** 2.3.4  
 **Status:** In opbouw (implementatiegericht)  
 **Datum:** 30 juni 2026  
 **Doel:** 1 centrale technische blauwdruk voor stapsgewijze realisatie
@@ -45,6 +45,10 @@
 | 2.2.8 | 2026-06-30 | T25-N04 t/m T25-N08 op Pass; volledige T25 testmatrix 8/8 groen en T25 op Gereed gezet | Byteway |
 | 2.2.9 | 2026-06-30 | T26 gestart: UX/foutafhandeling verbeterd voor frontend submit redirects en dashboard polling fallbackmeldingen | Byteway |
 | 2.3.0 | 2026-06-30 | T26 afgerond: uniforme UX-copy + consistente warning/error styling in frontend en admin | Byteway |
+| 2.3.1 | 2026-06-30 | T27 afgerond: releaseversie 0.3.0, package-document en artifact-commando's toegevoegd | Byteway |
+| 2.3.2 | 2026-06-30 | T27 gevalideerd: artifact `bso-spijkerbroek-0.3.0.zip` opgebouwd en package-commando gecorrigeerd voor `@eaDir` | Byteway |
+| 2.3.3 | 2026-06-30 | T28 afgerond: beheerders-handoff runbook opgeleverd en werkboard bijgewerkt | Byteway |
+| 2.3.4 | 2026-06-30 | T29 afgerond: formele Go-No-Go gate uitgevoerd en besluitdocument opgeleverd | Byteway |
 
 ### 1.2 Projectstatus
 
@@ -56,7 +60,7 @@
 | Admin UI | Geimplementeerd uitgebreid | Setup UI voor games/rondes/organisaties/spelers + demo setup + rondebeheer + HR-aanvraagbeheer actief |
 | Frontend formulieren | Geimplementeerd uitgebreid | Organisatiegericht teamdashboard + commitmentflow actief |
 | API/AJAX laag | Geimplementeerd uitgebreid | Dashboard endpoint + REST routes voor commitments/scores/hr-requests |
-| Release readiness | In voorbereiding | Game Ready smoke test, mobile check en contentplaatsing |
+| Release readiness | Go (voorwaardelijk productie) | Dev/staging vrijgegeven; productie na administratieve sluiting T19 |
 
 ### 1.3 Werkboard (voor uitvoering)
 
@@ -98,9 +102,9 @@
 | T24 | T19 formaliseren en sluiten (testrapportage + bewijs) | Hoog | Overgeslagen | Productieblok |
 | T25 | Security hardening check (nonce, capabilities, sanitization/escaping) | Hoog | Gereed | Productieblok |
 | T26 | UX en foutafhandeling polish (lock/no-team/no-data) | Midden | Gereed | Productieblok |
-| T27 | Release packaging (versie, changelog, artifact) | Midden | Niet gestart | Productieblok |
-| T28 | Beheerders-handoff compleet maken (runbook) | Midden | Niet gestart | Productieblok |
-| T29 | Go/No-Go gate met expliciete vrijgavecriteria | Hoog | Niet gestart | Productieblok |
+| T27 | Release packaging (versie, changelog, artifact) | Midden | Gereed | Productieblok |
+| T28 | Beheerders-handoff compleet maken (runbook) | Midden | Gereed | Productieblok |
+| T29 | Go/No-Go gate met expliciete vrijgavecriteria | Hoog | Gereed | Productieblok |
 
 ---
 
@@ -647,6 +651,58 @@ Afgeronde verbeteringen in code:
 T26 status:
 
 - `Gereed` (copy en foutafhandeling uniform doorgevoerd voor lock/no-data/error-paden)
+
+### 11.10 T27 Release Packaging - oplevering
+
+Opgeleverd:
+
+- plugin metadata bijgewerkt naar releaseversie `0.3.0` in `bso-spijkerbroek.php`
+- runtime constant `BSO_VERSION` bijgewerkt naar `0.3.0`
+- release package-document toegevoegd: `document/Release_Package_0.3.0.md`
+
+Inhoud van package-document:
+
+- exact zip-buildcommando voor artifact `bso-spijkerbroek-0.3.0.zip`
+- uitsluitingen voor ontwikkelbestanden (`.git`, `.github`, `@eaDir`, `tests`)
+- snelle validatiestappen met `unzip -l`
+- korte release notes en rollback-stappen
+
+T27 status:
+
+- `Gereed`
+
+### 11.11 T28 Beheerders-handoff - oplevering
+
+Opgeleverd:
+
+- handoff runbook: `document/Handoff_Runbook_Beheerder_0.3.0.md`
+- operationele procedures voor:
+	- quick start en dagelijkse beheerflow
+	- rondebeheer, spelerkoppeling en HR-aanvraagbeheer
+	- incidentafhandeling (geen data, submitfouten, lege scoreweergave)
+	- release en rollback stappen
+- aftekenchecklist voor overdracht toegevoegd
+
+T28 status:
+
+- `Gereed`
+
+### 11.12 T29 Go-No-Go Gate - oplevering
+
+Opgeleverd:
+
+- formeel besluitdocument: `document/Go_No_Go_Besluit_0.3.0.md`
+- beslismatrix met status op functioneel, security, UX, packaging en handoff
+- expliciet vrijgavebesluit vastgelegd
+
+Besluit:
+
+- Go voor dev/staging
+- productie: Go onder voorwaarde dat T19 administratief wordt afgesloten
+
+T29 status:
+
+- `Gereed`
 
 ---
 

@@ -1,13 +1,18 @@
 <?php
 /**
  * Plugin Name: BSO Spijkerbroek
+ * Description: Digitaal spijkerbroekenspel met teamdashboard, commitmentflow en rondegestuurde scoreverwerking.
+ * Version: 0.3.0
+ * Author: Byteway
+ * License: GPL-2.0-or-later
+ * Text Domain: bso-spijkerbroek
  */
 
 if (!defined('ABSPATH')) exit;
 
 define('BSO_PATH', plugin_dir_path(__FILE__));
 define('BSO_URL', plugin_dir_url(__FILE__));
-define('BSO_VERSION', '0.1.0');
+define('BSO_VERSION', '0.3.0');
 
 require_once BSO_PATH . 'includes/class-bso-spijkerbroek-activator.php';
 require_once BSO_PATH . 'includes/class-bso-spijkerbroek-deactivator.php';
