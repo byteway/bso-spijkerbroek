@@ -4,6 +4,31 @@ Economie introductie simulatie met focus op marketing- en logistieke elementen.
 
 ---
 
+## 🖼️ Schermafbeeldingen
+
+### Admin
+
+![Admin quick start](image/00_admin-quick_start.png)
+![Admin new game](image/01_admin-new_game.png)
+![Admin generate rounds](image/02_admin-generate_rounds.png)
+![Admin organization](image/03_admin-organization.png)
+![Admin player setup](image/04_admin-player_setup.png)
+![Admin edit player](image/05_admin-edit_player.png)
+![Admin round setup](image/06_admin-round_setup.png)
+![Admin onboard and resign](image/07_admin-onboard_resign.png)
+![Admin interim score](image/08_admin-interim_score.png)
+![Admin final score](image/09_admin-final_score.png)
+
+### Team / Speler
+
+![Team dashboard](image/10_team-dashboard.png)
+![Team overview](image/11_team-overview.png)
+![Team interim score](image/12_team-interim_score.png)
+![Team final score](image/13_team-final_score.png)
+![Team commitment](image/14_team-commitment.png)
+
+---
+
 ## 🎯 Doel van deze plugin
 
 De plugin ondersteunt het digitale spijkerbroekenspel en biedt een centrale omgeving waarin:
